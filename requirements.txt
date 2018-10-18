@@ -1,0 +1,10 @@
+pip
+setuptools
+wheel
+docutils
+pypiwin32
+pygments
+kivy.deps.glew
+kivy.deps.sdl2
+kivy
+pillow-pil
