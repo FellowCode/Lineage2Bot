@@ -1,45 +1,44 @@
-from PIL import ImageGrab
+from PIL import ImageGrab, ImageDraw, Image
 from ctypes import windll
-
-from kivy.app import App
-from kivy.core.window import Window
-from kivy.config import Config
-from kivy.uix.floatlayout import FloatLayout
+import cv2
+from numpy import *
+import numpy as np
+from desktopmagic.screengrab_win32 import getScreenAsImage
 
 user32 = windll.user32
 user32.SetProcessDPIAware()
 
-Config.set('graphics', 'fullscreen', 'auto')
-Config.set('graphics', 'borderless', 1)
-Config.write()
+def load_img_cv(path):
+    return cv2.imread(path, 0)
 
-img = ImageGrab.grab()
-#Window.borderless = True
-Window.size = (1920, 1080)
-Window.clearcolor = (0, 0, 0, 0)
+def get_screen():
+    return getScreenAsImage()
 
-import win32gui
-import win32con
-import win32api
+screen = get_screen()
+
+def get_screen_cv():
+    return array(screen.getdata(), dtype=uint8).reshape((screen.size[1], screen.size[0], 3))
+
+def find_template(img, template, method=0):
+    methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
+            'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
 
 
-class RootWidget(FloatLayout):
-    pass
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    res = cv2.matchTemplate(img, template, eval(methods[method]))
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+    # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
+    if eval(methods[method]) in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
+        top_left = min_loc
+    else:
+        top_left = max_loc
 
-class BotApp(App):
-    def build(self):
-        return RootWidget()
+    tp = Image.open('Screenshot_1.jpg')
+    draw = ImageDraw.Draw(screen)
+    draw.rectangle([top_left, (top_left[0]+tp.size[0], top_left[1]+tp.size[1])])
+    del draw
+    screen.save('screen.jpg', 'JPEG')
+    return max_val, top_left
 
-if __name__ == '__main__':
-    BotApp().run()
-    # Get the window
-    handle = win32gui.FindWindow(None, "Bot")
-
-    # Make it a layered window
-    win32gui.SetWindowLong(handle, win32con.GWL_EXSTYLE,
-                           win32gui.GetWindowLong(handle, win32con.GWL_EXSTYLE) | win32con.WS_EX_LAYERED)
-
-    # make it transparent (alpha between 0 and 255)
-    alpha = 255
-    win32gui.SetLayeredWindowAttributes(handle, win32api.RGB(0, 0, 0), alpha, win32con.LWA_ALPHA)
+print(find_template(get_screen_cv(), load_img_cv('Screenshot_1.jpg'), 3))
