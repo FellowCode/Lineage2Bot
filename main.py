@@ -3,17 +3,20 @@ from ctypes import windll
 
 from kivy.app import App
 from kivy.core.window import Window
+from kivy.config import Config
 from kivy.uix.floatlayout import FloatLayout
 
 user32 = windll.user32
 user32.SetProcessDPIAware()
 
+Config.set('graphics', 'fullscreen', 'auto')
+Config.set('graphics', 'borderless', 1)
+Config.write()
+
 img = ImageGrab.grab()
-Window.borderless = True
+#Window.borderless = True
 Window.size = (1920, 1080)
-Window.fullscreen = True
-Window.opacity = 0.1
-Window.color = (0, 0, 0, 0.5)
+Window.clearcolor = (0, 0, 0, 0)
 
 import win32gui
 import win32con
@@ -38,5 +41,5 @@ if __name__ == '__main__':
                            win32gui.GetWindowLong(handle, win32con.GWL_EXSTYLE) | win32con.WS_EX_LAYERED)
 
     # make it transparent (alpha between 0 and 255)
-    alpha = 0
+    alpha = 255
     win32gui.SetLayeredWindowAttributes(handle, win32api.RGB(0, 0, 0), alpha, win32con.LWA_ALPHA)
