@@ -1,44 +1,81 @@
-from PIL import ImageGrab, ImageDraw, Image
 from ctypes import windll
-import cv2
-from numpy import *
-import numpy as np
-from desktopmagic.screengrab_win32 import getScreenAsImage
+
+from functions import get_screen
+from l2bot import LineageWindow
+
+from kivy.app import App
+from kivy.graphics import Rectangle, Line, Color
+
+from kivy.config import Config
+from kivy.core.window import Window
+from kivy.uix.floatlayout import Layout
+
+Config.read('config.ini')
+Config.set('graphics', 'borderless', 1)
+Config.set('graphics', 'window_state', 'hidden')
+Config.write()
+
+Window.fullscreen = False
+
+import time
 
 user32 = windll.user32
 user32.SetProcessDPIAware()
 
-def load_img_cv(path):
-    return cv2.imread(path, 0)
+class RootWidget(Layout):
+    line = [0, 0, 0, 0]
+    screen_size = (0, 0)
 
-def get_screen():
-    return getScreenAsImage()
+    def create_screen(self):
+        screen = get_screen()
+        screen.save('tmp\\screenshot.jpg', 'JPEG', quality=90)
+        self.screen_size = screen.size
+        Window.size = (1921, screen.size[1])
+        Window.left = 0
+        Window.top = 0
+        self.root_widget.set_background()
 
-screen = get_screen()
+    def set_background(self):
+        with self.canvas:
+            self.bg_rect = Rectangle(source="tmp\\screenshot.jpg", pos=(0, 0), size=self.screen_size)
 
-def get_screen_cv():
-    return array(screen.getdata(), dtype=uint8).reshape((screen.size[1], screen.size[0], 3))
+    def set_line(self, points):
+        self.canvas.clear()
+        self.set_background()
+        with self.canvas:
+            Color(0.8, 0.2, 0.2, 1)
+            Line(points=points, width=1)
 
-def find_template(img, template, method=0):
-    methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-            'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+    def on_touch_down(self, touch):
+        self.line[0] = int(touch.pos[0])
+        self.line[1] = self.line[3] = int(touch.pos[1])
+
+    def on_touch_move(self, touch):
+        self.line[2] = int(touch.pos[0])
+        self.set_line(self.line)
+
+    def on_touch_up(self, touch):
+        self.line[2] = int(touch.pos[0])
+        self.set_line(self.line)
+
+class L2Bot(App):
+
+    def init_window(self):
+        l2_window = LineageWindow()
+        l2_window.save_screen()
+
+    def build(self):
+        self.init_window()
+        self.root_widget = RootWidget()
+        self.root_widget.create_screen()
+        return self.root_widget
+
+l2bot_app = L2Bot()
+
+if __name__ == '__main__':
+    l2bot_app.run()
 
 
+# lineage = LineageWindow(get_window_info()[0])
+# lineage.calibration()
 
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    res = cv2.matchTemplate(img, template, eval(methods[method]))
-    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-    # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
-    if eval(methods[method]) in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
-        top_left = min_loc
-    else:
-        top_left = max_loc
-
-    tp = Image.open('Screenshot_1.jpg')
-    draw = ImageDraw.Draw(screen)
-    draw.rectangle([top_left, (top_left[0]+tp.size[0], top_left[1]+tp.size[1])])
-    del draw
-    screen.save('screen.jpg', 'JPEG')
-    return max_val, top_left
-
-print(find_template(get_screen_cv(), load_img_cv('Screenshot_1.jpg'), 3))
