@@ -6,45 +6,41 @@ import win32gui
 
 WINDOW_SUBSTRING = 'Lineage II'
 
-def load_img_cv(path):
+def invert_top_pos(top_pos, height):
+    return height-top_pos
+
+def load_img_cv(path, thumbnail=1):
     img = Image.open(path)
-    img.thumbnail((img.size[0]//2, img.size[1]//2))
-    return array(img.getdata(), dtype=uint8).reshape((img.size[1], img.size[0], 3))
+    img.thumbnail((img.size[0]//thumbnail, img.size[1]//thumbnail))
+    return img_to_cv(img)
 
 def get_screen():
     return getScreenAsImage()
 
+def img_to_cv(img):
+    return array(img.getdata(), dtype=uint8).reshape((img.size[1], img.size[0], 3))
+
 screen_main = get_screen()
 
-def get_screen_cv(box=None):
+def get_screen_cv(box=None, thumbnail=1):
     screen = screen_main.copy()
-    screen.crop(box)
-    screen.thumbnail((screen.size[0]//2, screen.size[1]//2))
-    return array(screen.getdata(), dtype=uint8).reshape((screen.size[1], screen.size[0], 3))
+    if box:
+        screen.crop(box)
+    screen.thumbnail((screen.size[0]//thumbnail, screen.size[1]//thumbnail))
+    return img_to_cv(screen)
 
-def find_template(img, template, method=0):
+def find_template(img, template, method_id=0):
     methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
             'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
-    #img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    #template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
-    res = cv2.matchTemplate(img, template, eval(methods[method]))
+    res = cv2.matchTemplate(img, template, eval(methods[method_id]))
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
     # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
-    if eval(methods[method]) in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
+    if eval(methods[method_id]) in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
         top_left = min_loc
     else:
         top_left = max_loc
 
-    # tp = Image.open('target.jpg')
-    #
-    # l2 = Image.open('lineage2.jpg')
-    # draw = ImageDraw.Draw(l2)
-    # box = [(top_left[0]*2, top_left[1]*2), (top_left[0]*2+tp.size[0], top_left[1]*2+tp.size[1])]
-    # print(box)
-    # draw.rectangle(box, fill='white')
-    # del draw
-    # l2.save('lineage22.jpg', 'JPEG')
     return top_left
 
 
@@ -73,3 +69,9 @@ def get_window_coordinates(hwnd, windows_info):
             window_info['hwnd'] = hwnd
             windows_info.append(window_info)
             #win32gui.SetForegroundWindow(hwnd)
+
+def color_equal(pixel, value):
+    for i, color in enumerate(pixel):
+        if color > value[i] + 7 or color < value[i] - 7:
+            return False
+    return True
