@@ -1,7 +1,7 @@
 from ctypes import windll
 import os
 
-from functions import get_screen
+from functions import get_screen, get_windows_hwnd
 from l2bot import LineageWindow, ValuesMonitor
 
 
@@ -14,8 +14,6 @@ import time
 user32 = windll.user32
 user32.SetProcessDPIAware()
 
-
-
 class L2BotApp:
     cycle_update = False
 
@@ -23,12 +21,12 @@ class L2BotApp:
         self.master = master
         self.frame = tk.Frame(self.master)
 
-        self.l2_window = LineageWindow()
+        self.l2_window = LineageWindow(get_windows_hwnd('Lineage II')[0])
         self.show_main_window()
 
     def show_main_window(self):
         self.frame.title = 'Bot'
-        self.master.geometry('200x240+2200+600')
+        self.master.geometry('200x270+2200+600')
         self.master.resizable(False, False)
         auto_calibration_btn = Button(self.frame, text='Автокалибровка', height=1)
         auto_calibration_btn.place(relx=0.05, y=5, relwidth=0.9)
@@ -46,18 +44,22 @@ class L2BotApp:
         set_target_hp_button.place(relx=0.05, y=95, relwidth=0.9)
         set_target_hp_button.bind('<ButtonRelease-1>', lambda event: self.calibration_window_init('manual_target_hp'))
 
+        screen_btn = Button(self.frame, text='Сделать скриншот', height=1)
+        screen_btn.place(relx=0.05, y=125, relwidth=0.9)
+        screen_btn.bind('<ButtonRelease-1>', lambda ev: self.l2_window.save_screen())
+
         self.updater_button = Button(self.frame, text='Включить', height=1)
-        self.updater_button.place(relx=0.05, y=125, relwidth=0.9)
+        self.updater_button.place(relx=0.05, y=155, relwidth=0.9)
         self.updater_button.bind('<ButtonRelease-1>', self.change_cycle_update)
 
         self.hp_label = Label(text='HP: None')
-        self.hp_label.place(relx=0.05, y=160, relwidth=0.9)
+        self.hp_label.place(relx=0.05, y=190, relwidth=0.9)
 
         self.mp_label = Label(text='MP: None')
-        self.mp_label.place(relx=0.05, y=180, relwidth=0.9)
+        self.mp_label.place(relx=0.05, y=210, relwidth=0.9)
 
         self.target_hp_label = Label(text='T_HP: None')
-        self.target_hp_label.place(relx=0.05, y=200, relwidth=0.9)
+        self.target_hp_label.place(relx=0.05, y=230, relwidth=0.9)
 
         self.frame.place(x=0, y=0, relwidth=1, relheight=1)
 
@@ -147,7 +149,6 @@ class CalibrationWindow:
             self.btn_cancel.bind('<ButtonRelease-1>', cancel)
 
 
-        self.l2_window.update_screen()
         self.l2_window.calibration()
         self.draw_lines()
         self.master.focus_force()
@@ -231,13 +232,23 @@ class CalibrationWindow:
 
     def draw_lines(self):
         self.set_background()
-        self.hp_line = self.canvas.create_line(self.l2_window.hp_line, width=2, fill='white')
-        self.mp_line = self.canvas.create_line(self.l2_window.mp_line, width=2, fill='white')
-        self.target_hp_line = self.canvas.create_line(self.l2_window.target_hp_line, width=2, fill='white')
+        if self.l2_window.hp_line:
+            self.hp_line = self.canvas.create_line(self.l2_window.hp_line, width=2, fill='white')
+        if self.l2_window.mp_line:
+            self.mp_line = self.canvas.create_line(self.l2_window.mp_line, width=2, fill='white')
+        if self.l2_window.target_hp_line:
+            self.target_hp_line = self.canvas.create_line(self.l2_window.target_hp_line, width=2, fill='white')
+        try:
+            self.party_hp_lines = []
+            self.party_mp_lines = []
+            for i, php_line in enumerate(self.l2_window.party_hp_lines):
+                self.party_hp_lines.append(self.canvas.create_line(php_line, width=2, fill='white'))
+                self.party_mp_lines.append(self.canvas.create_line(self.l2_window.party_mp_lines, width=2, fill='white'))
+        except:
+            pass
 
-root = tk.Tk()
-app = L2BotApp(root)
-
-#root.after(1000, update_values)
-root.mainloop()
+if __name__ == '__main__':
+    root = tk.Tk()
+    app = L2BotApp(root)
+    root.mainloop()
 

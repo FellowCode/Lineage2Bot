@@ -30,9 +30,8 @@ def get_screen_cv(box=None, thumbnail=1):
     return img_to_cv(screen)
 
 def find_template(img, template, method_id=0):
-    methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-            'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
-
+    methods = ['cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR_NORMED']
+    #'cv2.TM_SQDIFF_NORMED'
     res = cv2.matchTemplate(img, template, eval(methods[method_id]))
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
     # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
@@ -41,37 +40,36 @@ def find_template(img, template, method_id=0):
     else:
         top_left = max_loc
 
-    return top_left
+    if max_val > 0.91:
+        return top_left
+    else:
+        return None
 
 
-def get_window_info():
-    # set window info
+def get_windows_hwnd(window_substring):
     windows_info = []
-    win32gui.EnumWindows(get_window_coordinates, windows_info)
+    WINDOW_SUBSTRING = window_substring
+    win32gui.EnumWindows(get_window_hwnd, windows_info)
     return windows_info
 
-# EnumWindows handler
-# sets L2 window coordinates
-def get_window_coordinates(hwnd, windows_info):
+def get_window_hwnd(hwnd, windows_info):
     if win32gui.IsWindowVisible(hwnd):
         if WINDOW_SUBSTRING in win32gui.GetWindowText(hwnd):
-            rect = win32gui.GetWindowRect(hwnd)
-            window_info = {}
-            x = rect[0] + 8
-            y = rect[1] + 8
-            w = rect[2] - x - 8
-            h = rect[3] - y - 8
-            window_info['x'] = x
-            window_info['y'] = y
-            window_info['width'] = w
-            window_info['height'] = h
-            window_info['name'] = win32gui.GetWindowText(hwnd)
-            window_info['hwnd'] = hwnd
-            windows_info.append(window_info)
-            #win32gui.SetForegroundWindow(hwnd)
+            windows_info.append(hwnd)
 
 def color_equal(pixel, value):
-    for i, color in enumerate(pixel):
-        if color > value[i] + 7 or color < value[i] - 7:
-            return False
-    return True
+    if type(value) is list:
+        for val in value:
+            overlap = True
+            for i, color in enumerate(pixel):
+                if color > val[i] + 5 or color < val[i] - 5:
+                    overlap = False
+                    break
+            if overlap:
+                return True
+        return False
+    else:
+        for i, color in enumerate(pixel):
+            if color > value[i] + 7 or color < value[i] - 7:
+                return False
+        return True
