@@ -3,13 +3,15 @@ from time import sleep
 import time
 from colors import GraciaColors
 from multiprocessing import Process, Value, Array
-
+import os
 from threading import Thread
 
 import win32gui
 
+
 class ValuesMonitor(Thread):
     work = True
+
     def __init__(self, app):
         super().__init__()
         self.app = app
@@ -22,6 +24,7 @@ class ValuesMonitor(Thread):
 
     def stop(self):
         self.work = False
+
 
 class FindTemplate(Thread):
     def __init__(self, window, var_name, template_path):
@@ -47,14 +50,25 @@ class FindTemplate(Thread):
         exec(self.var_name + ' = self.get_template_pos()')
         print('end', self.path)
 
+
 class LineageWindow:
     stat_pos = (0, 0)
     target_pos = (0, 0)
     screen = None
     hp = mp = target_hp = -1
-    def __init__(self, hwnd):
+
+    def __init__(self, hwnd, attack=None, hp_potion=None, target_bliz=None, target_dal=None, mob_dead=None,
+                 se_window=None, pp_window=None, bd_window=None):
         self.hwnd = hwnd
         self.update_window_info()
+        self.attack = attack
+        self.hp_potion = hp_potion
+        self.target_bliz = target_bliz
+        self.target_dal = target_dal
+        self.mob_dead = mob_dead
+        self.se_window = se_window
+        self.pp_window = pp_window
+        self.bd_window = bd_window
 
     def update_window_info(self):
         rect = win32gui.GetWindowRect(self.hwnd)
@@ -70,11 +84,14 @@ class LineageWindow:
         self.update_window_info()
         try:
             win32gui.SetForegroundWindow(self.hwnd)
-        except: pass
+        except:
+            pass
         self.screen = get_screen().crop(self.box)
 
     def save_screen(self):
         self.update_screen()
+        if not os.path.exists('tmp'):
+            os.makedirs('tmp')
         self.screen.save('tmp\\l2.jpg', 'JPEG', quality=100)
 
     @staticmethod
@@ -88,6 +105,7 @@ class LineageWindow:
                 pos = find_template(screen_cv, load_img_cv(path), i)
             template_pos[0] = pos[0]
             template_pos[1] = pos[1]
+            print(pos)
         except:
             template_pos[0] = -1
             template_pos[1] = -1
@@ -120,19 +138,17 @@ class LineageWindow:
         if party_pos[0] != -1:
             self.party_pos = [party_pos[0], party_pos[1]]
 
-
-
-        hp_start_pos = (self.stat_pos[0]+50, self.stat_pos[1])
+        hp_start_pos = (self.stat_pos[0] + 50, self.stat_pos[1])
 
         self.hp_line = self.get_value_line(hp_start_pos, 100, GraciaColors.hp)
         self.mp_line = self.get_value_line(hp_start_pos, 100, GraciaColors.mp)
 
         if hasattr(self, 'target_pos'):
-            target_start_pos = (self.target_pos[0]+40, self.target_pos[1])
+            target_start_pos = (self.target_pos[0] + 40, self.target_pos[1])
             self.target_hp_line = self.get_value_line(target_start_pos, 100, GraciaColors.target_hp)
 
         if hasattr(self, 'party_pos'):
-            party_start_pos = (self.party_pos[0]+40, self.party_pos[1])
+            party_start_pos = (self.party_pos[0] + 40, self.party_pos[1])
             self.party_hp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.target_hp)]
             self.party_mp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.mp)]
             while True:
@@ -194,7 +210,7 @@ class LineageWindow:
 
         while not color_equal(pixel, color):
             start_pos[1] += 1
-            if start_pos[1] == self.size[1]-1 or start_pos[1] > top + max_height:
+            if start_pos[1] == self.size[1] - 1 or start_pos[1] > top + max_height:
                 return None
             pixel = rgb_screen.getpixel((start_pos[0], start_pos[1]))
             # if start_pos[1] > top+max_height:
@@ -230,3 +246,49 @@ class LineageWindow:
                 return None
             i += 1
         return [left, top, right, top]
+
+
+class SupportWindow:
+    from threading import Timer
+
+    def __init__(self, hwnd, attack=None, heal=None, recharge=None, buff=None, buff_time=1100):
+        self.hwnd = hwnd
+        self.attack = attack
+        self.heal = heal
+        self.recharge = recharge
+        self.buff = buff
+        self.buff_time = buff_time
+        if buff:
+            self.need_buff = True
+        else:
+            self.need_buff = False
+
+    def use_buff(self):
+        win32gui.SetForegroundWindow(self.hwnd)
+        sleep(0.1)
+        self.click_btn(self.buff)
+
+        self.need_buff = False
+        t = self.Timer(self.buff_time, self.set_need_buff)
+        t.start()
+
+    def use_heal(self):
+        win32gui.SetForegroundWindow(self.hwnd)
+        sleep(0.1)
+        self.click_btn(self.heal)
+
+    def use_recharge(self):
+        win32gui.SetForegroundWindow(self.hwnd)
+        sleep(0.1)
+        self.click_btn(self.recharge)
+
+    def use_attack(self):
+        win32gui.SetForegroundWindow(self.hwnd)
+        sleep(0.1)
+        self.click_btn(self.attack)
+
+    def set_need_buff(self):
+        self.need_buff = True
+
+    def click_btn(self, btn):
+        pass

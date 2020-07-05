@@ -4,3 +4,6 @@ wheel
 pypiwin32
 pillow-pil
 pynput
+desktopmagic
+numpy
+opencv-python

@@ -1,0 +1,1 @@
+{'main_name': 'luki1', 'main_target': '', 'main_target_daln': '', 'main_attack': '', 'main_mob_dead': '', 'main_hp_potion': '', 'se_name': 'se1', 'se_pos': 0, 'se_heal': '', 'se_recharge': '', 'se_buff': '', 'pp_name': '', 'pp_pos': 0, 'pp_buff': '', 'bd_name': '', 'bd_pos': 0, 'bd_buff': '', 'bd_attack': ''}

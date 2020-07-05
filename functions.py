@@ -4,7 +4,7 @@ import cv2
 from numpy import *
 import win32gui
 
-WINDOW_SUBSTRING = 'Lineage II'
+window_substring = 'Lineage II'
 
 def invert_top_pos(top_pos, height):
     return height-top_pos
@@ -46,15 +46,16 @@ def find_template(img, template, method_id=0):
         return None
 
 
-def get_windows_hwnd(window_substring):
+def get_windows_hwnd(window_subs):
     windows_info = []
-    WINDOW_SUBSTRING = window_substring
+    global window_substring
+    window_substring = window_subs
     win32gui.EnumWindows(get_window_hwnd, windows_info)
     return windows_info
 
 def get_window_hwnd(hwnd, windows_info):
     if win32gui.IsWindowVisible(hwnd):
-        if WINDOW_SUBSTRING in win32gui.GetWindowText(hwnd):
+        if window_substring in win32gui.GetWindowText(hwnd):
             windows_info.append(hwnd)
 
 def color_equal(pixel, value):
