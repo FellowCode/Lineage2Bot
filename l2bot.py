@@ -52,23 +52,61 @@ class FindTemplate(Thread):
 
 
 class LineageWindow:
+    from threading import Timer
+
+    def __init__(self, hwnd, attack=None, heal=None, recharge=None, buff=None, buff_time=1100):
+        self.hwnd = hwnd
+        self.attack = attack
+        self.heal = heal
+        self.recharge = recharge
+        self.buff = buff
+        self.buff_time = buff_time
+        if buff:
+            self.need_buff = True
+        else:
+            self.need_buff = False
+
+    def use_buff(self):
+        win32gui.SetForegroundWindow(self.hwnd)
+        sleep(0.1)
+        self.click_btn(self.buff)
+
+        self.need_buff = False
+        t = self.Timer(self.buff_time, self.set_need_buff)
+        t.start()
+
+    def use_heal(self):
+        win32gui.SetForegroundWindow(self.hwnd)
+        sleep(0.1)
+        self.click_btn(self.heal)
+
+    def use_recharge(self):
+        win32gui.SetForegroundWindow(self.hwnd)
+        sleep(0.1)
+        self.click_btn(self.recharge)
+
+    def use_attack(self):
+        win32gui.SetForegroundWindow(self.hwnd)
+        sleep(0.1)
+        self.click_btn(self.attack)
+
+    def set_need_buff(self):
+        self.need_buff = True
+
+    def click_btn(self, btn):
+        pass
+
+
+class MainLineageWindow(LineageWindow):
     stat_pos = (0, 0)
     target_pos = (0, 0)
     screen = None
     hp = mp = target_hp = -1
 
-    def __init__(self, hwnd, attack=None, hp_potion=None, target_bliz=None, target_dal=None, mob_dead=None,
-                 se_window=None, pp_window=None, bd_window=None):
+    def __init__(self, hwnd):
+        super().__init__(hwnd)
         self.hwnd = hwnd
         self.update_window_info()
-        self.attack = attack
-        self.hp_potion = hp_potion
-        self.target_bliz = target_bliz
-        self.target_dal = target_dal
-        self.mob_dead = mob_dead
-        self.se_window = se_window
-        self.pp_window = pp_window
-        self.bd_window = bd_window
 
     def update_window_info(self):
         rect = win32gui.GetWindowRect(self.hwnd)
@@ -246,49 +284,3 @@ class LineageWindow:
                 return None
             i += 1
         return [left, top, right, top]
-
-
-class SupportWindow:
-    from threading import Timer
-
-    def __init__(self, hwnd, attack=None, heal=None, recharge=None, buff=None, buff_time=1100):
-        self.hwnd = hwnd
-        self.attack = attack
-        self.heal = heal
-        self.recharge = recharge
-        self.buff = buff
-        self.buff_time = buff_time
-        if buff:
-            self.need_buff = True
-        else:
-            self.need_buff = False
-
-    def use_buff(self):
-        win32gui.SetForegroundWindow(self.hwnd)
-        sleep(0.1)
-        self.click_btn(self.buff)
-
-        self.need_buff = False
-        t = self.Timer(self.buff_time, self.set_need_buff)
-        t.start()
-
-    def use_heal(self):
-        win32gui.SetForegroundWindow(self.hwnd)
-        sleep(0.1)
-        self.click_btn(self.heal)
-
-    def use_recharge(self):
-        win32gui.SetForegroundWindow(self.hwnd)
-        sleep(0.1)
-        self.click_btn(self.recharge)
-
-    def use_attack(self):
-        win32gui.SetForegroundWindow(self.hwnd)
-        sleep(0.1)
-        self.click_btn(self.attack)
-
-    def set_need_buff(self):
-        self.need_buff = True
-
-    def click_btn(self, btn):
-        pass

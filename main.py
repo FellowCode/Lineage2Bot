@@ -2,10 +2,11 @@ from ctypes import windll
 import os
 
 from functions import get_screen, get_windows_hwnd
-from l2bot import LineageWindow, ValuesMonitor, SupportWindow
+from l2bot import MainLineageWindow, ValuesMonitor, LineageWindow
 
 import tkinter as tk
 from tkinter import *
+from tkinter import ttk
 from PIL import ImageTk, Image
 
 import time
@@ -99,28 +100,7 @@ class L2BotApp:
         self.app = CalibrationWindow(self, method)
 
     def setup_l2_window(self):
-        key_bind = KeyBind()
-        if len(key_bind.se_name.get()) > 0:
-            self.se_window = SupportWindow(get_windows_hwnd(key_bind.se_name.get())[0],
-                                           recharge=key_bind.se_recharge.get(), heal=key_bind.se_heal.get(),
-                                           buff=key_bind.se_buff.get())
-        else:
-            self.se_window = None
-        if len(key_bind.pp_name.get()) > 0:
-            self.pp_window = SupportWindow(get_windows_hwnd(key_bind.pp_name.get())[0], buff=key_bind.pp_buff.get())
-        else:
-            self.pp_window = None
-        if len(key_bind.bd_name.get()) > 0:
-            self.bd_window = SupportWindow(get_windows_hwnd(key_bind.bd_name.get())[0], attack=key_bind.bd_attack.get(),
-                                           buff=key_bind.bd_buff.get(), buff_time=120)
-        else:
-            self.bd_window = None
-
-        self.l2_window = LineageWindow(get_windows_hwnd(key_bind.main_name.get())[0], attack=key_bind.main_attack.get(),
-                                       target_bliz=key_bind.main_target.get(),
-                                       target_dal=key_bind.main_target_daln.get(),
-                                       hp_potion=key_bind.main_hp_potion.get(), mob_dead=key_bind.main_mob_dead.get(),
-                                       se_window=self.se_window, pp_window=self.pp_window, bd_window=self.bd_window)
+        self.l2_window = MainLineageWindow(get_windows_hwnd('aaa')[0])
 
     def window_setup_l2_supports(self):
         self.supports_window = Toplevel(self.master)
@@ -129,112 +109,89 @@ class L2BotApp:
 
 class SupportsSetupWindow:
     def __init__(self, main_window):
+        self.root = main_window
         self.master = main_window.supports_window
-        self.master.geometry('400x340+2200+600')
+        self.master.geometry('600x340+2200+600')
         self.master.resizable(False, False)
 
-        self.key_bind = KeyBind()
+        self.window_bind = WindowBind()
 
         self.ui_init()
 
     def ui_init(self):
-        # Основа
-        title = Label(self.master, text='Основа')
-        title.place(x=10, y=5)
-        main_name_entry = Entry(self.master, textvariable=self.key_bind.main_name)
-        main_name_entry.place(x=10, y=25, width=120)
-        Label(self.master, text='Цель близ.').place(x=160, y=25)
-        Entry(self.master, textvariable=self.key_bind.main_target).place(x=230, y=25, width=30)
-        Label(self.master, text='Цель даль.').place(x=270, y=25)
-        Entry(self.master, textvariable=self.key_bind.main_target_daln).place(x=340, y=25, width=30)
-        Label(self.master, text='Атака').place(x=10, y=55)
-        Entry(self.master, textvariable=self.key_bind.main_attack).place(x=50, y=55, width=30)
-        Label(self.master, text='Смерть моба').place(x=100, y=55)
-        Entry(self.master, textvariable=self.key_bind.main_mob_dead).place(x=180, y=55, width=30)
-        Label(self.master, text='HP банка').place(x=220, y=55)
-        Entry(self.master, textvariable=self.key_bind.main_hp_potion).place(x=280, y=55, width=30)
+        tab_parent = ttk.Notebook(self.master)
 
-        # SE \ EE
+        tab_names = [StringVar()]*9
 
-        Label(self.master, text='Shilen Elder \ Elven Elder').place(x=10, y=85)
-        Label(self.master, text='Место в пати').place(x=170, y=85)
-        Entry(self.master, textvariable=self.key_bind.se_name).place(x=10, y=105, width=120)
-        Entry(self.master, textvariable=self.key_bind.se_pos).place(x=170, y=105, width=40)
-        Label(self.master, text='Heal').place(x=10, y=130)
-        Entry(self.master, textvariable=self.key_bind.se_heal).place(x=50, y=130, width=30)
-        Label(self.master, text='Recharge').place(x=90, y=130)
-        Entry(self.master, textvariable=self.key_bind.se_recharge).place(x=150, y=130, width=30)
-        Label(self.master, text='Buff').place(x=190, y=130)
-        Entry(self.master, textvariable=self.key_bind.se_buff).place(x=230, y=130, width=30)
+        for i in range(9):
+            tab = ttk.Frame(tab_parent)
 
-        # Prophet
+            tab_parent.add(tab, text=f'Окно {i + 1}')
+            frame = ttk.Frame(tab)
+            ttk.Label(frame, text='Название окна').pack(side=LEFT)
+            ttk.Entry(frame, textvariable=tab_names[i]).pack(side=LEFT)
+            ttk.Button(frame, text='Добавить триггер', command=lambda: self.add_trigger(i)).pack(side=LEFT)
+            frame.pack(side=LEFT)
 
-        Label(self.master, text='Prophet').place(x=10, y=160)
-        Entry(self.master, textvariable=self.key_bind.pp_name).place(x=10, y=180, width=120)
-        Entry(self.master, textvariable=self.key_bind.pp_pos).place(x=170, y=180, width=40)
-        Label(self.master, text='Buff').place(x=10, y=205)
-        Entry(self.master, textvariable=self.key_bind.pp_buff).place(x=50, y=205, width=30)
+        tab_parent.pack(expand=1, fill='both')
 
-        # Bladedancer
+        btn_frame = ttk.Frame(self.master)
+        btn_frame.pack(side=BOTTOM)
 
-        Label(self.master, text='Bladedancer').place(x=10, y=235)
-        Entry(self.master, textvariable=self.key_bind.bd_name).place(x=10, y=255, width=120)
-        Entry(self.master, textvariable=self.key_bind.bd_pos).place(x=170, y=255, width=40)
-        Label(self.master, text='Buff').place(x=10, y=280)
-        Entry(self.master, textvariable=self.key_bind.bd_buff).place(x=50, y=280, width=30)
-        Label(self.master, text='Атака').place(x=90, y=280)
-        Entry(self.master, textvariable=self.key_bind.bd_attack).place(x=130, y=280, width=30)
-
-        btn = Button(self.master, text='Сохранить', height=1)
-        btn.place(x=10, y=310)
-        btn.bind('<ButtonRelease-1>', lambda ev: self.save())
-
-    def save(self):
-        self.key_bind.save()
-        self.master.destroy()
+    def add_trigger(self, i):
+        self.trigger_window = Toplevel(self.master)
+        self.app = TriggerWindow(self, i)
 
 
-class KeyBind:
+
+class TriggerWindow:
+    def __init__(self, root, index):
+        self.root = root
+        self.index = index
+        self.master = root.trigger_window
+        self.master.geometry('280x150')
+        self.master.resizable(False, False)
+
+        ttk.Label(self.master, text='Выберите триггер').pack()
+        self.trigger = StringVar()
+        trigger_list = ttk.Combobox(self.master, width=30)
+        trigger_list['values'] = ['ХП основы меньше ...%',
+                                  'МП основы меньше ...%',
+                                  'Баф каждые n с.',
+                                  'Нет цели',
+                                  'Моб убит']
+        trigger_list.pack()
+
+        ttk.Label(self.master, text='Значение если есть').pack()
+        self.value = IntVar()
+        ttk.Entry(self.master, width=10, textvariable=self.value).pack()
+        ttk.Label(self.master, text='Кнопка (F)').pack()
+        self.btn = IntVar()
+        ttk.Entry(self.master, width=10, textvariable=self.btn).pack()
+        ttk.Button(self.master, text='Добавить', command=self.add).pack()
+
+    def add(self):
+        self.root.window_bind.values[self.index]['triggers'].append(
+            {'trigger': self.trigger.get(), 'value': self.value.get(), 'btn': self.btn.get()})
+        self.root.window_bind.save()
+        #self.root.master.destroy()
+        #self.root.__init__(self.root.root)
+
+
+class WindowBind:
     def __init__(self):
-        self.main_name = StringVar()
-        self.main_target = StringVar()
-        self.main_target_daln = StringVar()
-        self.main_attack = StringVar()
-        self.main_mob_dead = StringVar()
-        self.main_hp_potion = StringVar()
-
-        self.se_name = StringVar()
-        self.se_pos = IntVar()
-        self.se_heal = StringVar()
-        self.se_recharge = StringVar()
-        self.se_buff = StringVar()
-
-        self.pp_name = StringVar()
-        self.pp_pos = IntVar()
-        self.pp_buff = StringVar()
-
-        self.bd_name = StringVar()
-        self.bd_pos = IntVar()
-        self.bd_buff = StringVar()
-        self.bd_attack = StringVar()
-
-        self.load()
+        self.values = [{'name': '', 'triggers': []}]*9
 
     def save(self):
         if not os.path.exists('save'):
             os.makedirs('save')
         with open('save/window_bind.txt', 'w') as f:
-            d = {}
-            for key, value in self.__dict__.items():
-                d[key] = value.get()
-            print(d, file=f)
+            print(str(self.values), file=f)
 
     def load(self):
         if os.path.exists('save/window_bind.txt'):
             with open('save/window_bind.txt', 'r') as f:
-                d = eval(f.read().strip())
-                for key, value in d.items():
-                    self.__dict__[key].set(value)
+                self.values = eval(f.read().strip())
 
 
 class CalibrationWindow:
