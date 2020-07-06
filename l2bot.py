@@ -9,6 +9,8 @@ from threading import Thread
 import serial
 import win32gui
 
+from windows_settings import WindowInfo
+
 
 class ValuesMonitor(Thread):
     work = True
@@ -65,12 +67,12 @@ class SerialSender(Thread):
     def run(self):
         while self.work:
             if self.msg:
-                self.serial.write(str(self.msg) + '\n')
+                self.serial.write(self.msg)
                 self.msg = None
             sleep(0.01)
 
     def send(self, msg):
-        self.msg = msg
+        self.msg = str(str(msg) + '\n').encode()
 
     def connect(self):
         self.serial = serial.Serial(self.com, 115200, timeout=0)
@@ -83,15 +85,15 @@ class SerialSender(Thread):
 class LineageWindow:
     from threading import Timer
 
-    def __init__(self, window_settings, serial_sender):
-        self.serial_sender = serial_sender
+    def __init__(self, window_settings, app):
+        self.app = app
         self.hwnd = get_windows_hwnd(window_settings['name'])[0]
         self.window_settings = window_settings
 
     def click_btn(self, btn_code):
         win32gui.SetForegroundWindow(self.hwnd)
         sleep(0.1)
-        self.serial_sender.send(btn_code)
+        self.app.serial_sender.send(btn_code)
 
 
 class MainLineageWindow(LineageWindow):
@@ -100,15 +102,16 @@ class MainLineageWindow(LineageWindow):
     screen = None
     hp = mp = target_hp = -1
 
-    def __init__(self, windows_settings, serial_sender):
+    def __init__(self, windows_settings, app):
 
         self.support_windows = []
 
         for i in range(1, 9, 1):
             if windows_settings[i]['active'] == 1:
-                self.support_windows.append(LineageWindow(windows_settings[i]))
+                self.support_windows.append(LineageWindow(windows_settings[i], app))
 
-        super().__init__(windows_settings[0], serial_sender)
+        super().__init__(windows_settings[0], app)
+        self.last_target_hp = 0
         self.update_window_info()
 
     def update_window_info(self):
@@ -213,6 +216,29 @@ class MainLineageWindow(LineageWindow):
             self.mp = self.get_percent_value(self.mp_line, GraciaColors.mp)
         if hasattr(self, 'target_hp_line'):
             self.target_hp = self.get_percent_value(self.target_hp_line, GraciaColors.target_hp, digits_on_line=False)
+
+        for trigger_name in WindowInfo.ordering:
+            triggers = self.window_settings['triggers'][trigger_name]
+            for trigger in triggers:
+                if trigger_name == 'hp_lt' and trigger['percent'] > self.hp:
+                    self.click_btn(trigger['btn'])
+                    print('trigger', 'hp_lt')
+                if trigger_name == 'mp_lt' and trigger['percent'] > self.mp:
+                    self.click_btn(trigger['btn'])
+                    print('trigger', 'mp_lt')
+                if trigger_name == 'mob_dead' and self.target_hp == 0 and self.last_target_hp > 0:
+                    self.click_btn(trigger['btn'])
+                    print('trigger', 'mob_dead')
+                if trigger_name == 'no_target' and self.target_hp == 0 and self.last_target_hp == 0:
+                    self.click_btn(trigger['btn'])
+                    print('trigger', 'no_target')
+                if trigger_name == 'target_hp' and self.target_hp > trigger['percent']:
+                    self.click_btn(trigger['btn'])
+                    print('trigger', 'target_hp')
+
+        self.last_target_hp = self.target_hp
+
+
 
     def get_percent_value(self, line, color, digits_on_line=True):
         left = line[0]

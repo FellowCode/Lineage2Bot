@@ -10,6 +10,7 @@ from tkinter.font import Font
 from tkinter import *
 from tkinter import ttk
 from PIL import ImageTk, Image
+from windows_settings import WindowInfo
 
 import time
 
@@ -21,6 +22,7 @@ class L2BotApp:
     cycle_update = False
 
     def __init__(self, master):
+        self.serial_sender = None
         self.master = master
         self.frame = tk.Frame(self.master)
 
@@ -80,7 +82,7 @@ class L2BotApp:
             self.updater_button['text'] = 'Выключить'
             self.monitor = ValuesMonitor(self)
             self.monitor.start()
-            self.serial_sender = SerialSender('COM3')
+            self.serial_sender = SerialSender('COM5')
             self.serial_sender.start()
         else:
             self.monitor.stop()
@@ -103,7 +105,7 @@ class L2BotApp:
 
     def setup_l2_window(self):
         windows_settings = WindowInfo()
-        self.l2_window = MainLineageWindow(windows_settings, self.serial_sender)
+        self.l2_window = MainLineageWindow(windows_settings, self)
 
     def window_setup_l2_supports(self):
         self.supports_window = Toplevel(self.master)
@@ -186,7 +188,7 @@ class SetupWindowsSettings:
 
         for trigger_name in WindowInfo.ordering:
             for trigger in self.window_info[window_i]['triggers'][trigger_name]:
-                percent = str(trigger.get('lt_percent', ''))
+                percent = str(trigger.get('percent', ''))
                 if percent != '':
                     percent += '%'
                 use_time = str(trigger.get('use_time', ''))
@@ -220,7 +222,8 @@ class TriggerWindow:
                 'МП партийца меньше ...%': 'mp_party_lt',
                 'Бафф': 'buff',
                 'Нет цели': 'no_target',
-                'Моб убит': 'mob_dead'}
+                'Моб убит': 'mob_dead',
+                'ХП цели больше ...%': 'target_hp'}
 
     def __init__(self, root, index):
         self.root = root
@@ -261,14 +264,14 @@ class TriggerWindow:
         tr = self.convert(self.trigger.get())
         d = {}
         if tr == 'hp_lt' or tr == 'mp_lt' or tr == 'hp_party_lt' or tr == 'mp_party_lt':
-            d = {'lt_percent': self.percent.get(), 'btn': self.btn.get(), 'use_time': self.use_time.get(),
+            d = {'percent': self.percent.get(), 'btn': self.btn.get(), 'use_time': self.use_time.get(),
                  'cooldown': self.cooldown.get()}
         elif tr == 'buff':
             d = {'btn': self.btn.get(), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get()}
-        elif tr == 'mob_dead':
-            d = {'btn': self.btn.get(), 'use_time': self.use_time.get()}
-        elif tr == 'no_target':
-            d = {'btn': self.btn.get(), 'use_time': self.use_time.get()}
+        elif tr == 'mob_dead' or tr == 'no_target':
+            d = {'btn': self.btn.get(), 'cooldown': self.cooldown.get()}
+        elif tr == 'target_hp':
+            d = {'btn': self.btn.get(), 'cooldown': self.cooldown.get(), 'percent': self.percent.get()}
         self.root.window_info[self.index]['triggers'][tr].append(d)
         self.root.window_info.save()
         self.root.update_listbox(self.index)
@@ -281,56 +284,6 @@ class TriggerWindow:
         for key, trigger in cls.TRIGGERS.items():
             if trigger == value:
                 return key
-
-
-class WindowInfo:
-    ordering = ['hp_lt', 'mp_lt', 'hp_party_lt', 'mp_party_lt', 'mob_dead', 'buff', 'no_target']
-
-    def __init__(self):
-        self.values = [{'active': 0, 'name': '',
-                        'triggers': {'hp_lt': [], 'mp_lt': [], 'hp_party_lt': [], 'mp_party_lt': [], 'mob_dead': [],
-                                     'no_target': [], 'buff': []}}
-                       for x in range(9)]
-        self.load()
-
-    def save(self):
-        if not os.path.exists('save'):
-            os.makedirs('save')
-        with open('save/window_bind.l2b', 'wb') as f:
-            pickle.dump(self.values, f)
-
-    def load(self):
-        if os.path.exists('save/window_bind.l2b'):
-            with open('save/window_bind.l2b', 'rb') as f:
-                try:
-                    self.values = pickle.load(f)
-                except:
-                    pass
-
-    def delete_by_i(self, window_i, del_i):
-        window_tr = self[window_i]['triggers']
-
-        i = 0
-        while del_i > len(self.sum_tr_list(window_i, i)) - 1:
-            i += 1
-        i -= 1
-        if i == 0:
-            window_tr[self.ordering[i]].pop(del_i)
-        elif i > 0:
-            window_tr[self.ordering[i]].pop(del_i - len(self.sum_tr_list(window_i, i - 1)))
-
-    def sum_tr_list(self, window_i, count):
-        window_tr = self[window_i]['triggers']
-        l = []
-        for i in range(min(count, len(self.ordering))):
-            l += window_tr[self.ordering[i]]
-        return l
-
-    def __getitem__(self, item):
-        return self.values[item]
-
-    def __str__(self):
-        return str(self.values)
 
 
 class CalibrationWindow:
