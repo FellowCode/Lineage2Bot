@@ -1,3 +1,4 @@
+import pickle
 from ctypes import windll
 import os
 
@@ -5,6 +6,7 @@ from functions import get_screen, get_windows_hwnd
 from l2bot import MainLineageWindow, ValuesMonitor, LineageWindow
 
 import tkinter as tk
+from tkinter.font import Font
 from tkinter import *
 from tkinter import ttk
 from PIL import ImageTk, Image
@@ -108,20 +110,23 @@ class L2BotApp:
 
 
 class SupportsSetupWindow:
-    def __init__(self, main_window):
-        self.root = main_window
-        self.master = main_window.supports_window
-        self.master.geometry('600x340+2200+600')
+    def __init__(self, root):
+        self.root = root
+        self.master = root.supports_window
+        self.master.geometry(f'600x340+{root.master.winfo_x()}+{root.master.winfo_y()}')
         self.master.resizable(False, False)
 
-        self.window_bind = WindowBind()
+        self.window_info = WindowInfo()
 
         self.ui_init()
 
     def ui_init(self):
         tab_parent = ttk.Notebook(self.master)
 
-        tab_names = [StringVar()]*9
+        self.listboxes = []
+        self.names = []
+
+        font = Font(family="Lucida Console", size=10)
 
         for i in range(9):
             tab = ttk.Frame(tab_parent)
@@ -129,69 +134,196 @@ class SupportsSetupWindow:
             tab_parent.add(tab, text=f'Окно {i + 1}')
             frame = ttk.Frame(tab)
             ttk.Label(frame, text='Название окна').pack(side=LEFT)
-            ttk.Entry(frame, textvariable=tab_names[i]).pack(side=LEFT)
-            ttk.Button(frame, text='Добавить триггер', command=lambda: self.add_trigger(i)).pack(side=LEFT)
-            frame.pack(side=LEFT)
+            sv = StringVar()
+            sv.set(self.window_info[i]['name'])
+            self.names.append(sv)
+            ttk.Entry(frame, textvariable=sv).pack(side=LEFT, padx=3)
+            ttk.Button(frame, text='Сохранить', command=lambda a=i: self.save_name(a)).pack(side=LEFT, padx=3)
+            ttk.Button(frame, text='Добавить триггер', command=lambda a=i: self.add_trigger(a)).pack(side=LEFT, padx=3)
+            ttk.Button(frame, text='Удалить триггер', command=lambda a=i: self.delete_trigger(a)).pack(side=LEFT,
+                                                                                                       padx=3)
+            frame.pack(anchor=NW, fill=X, pady=3)
+            frame = ttk.Frame(tab)
+            ttk.Label(frame, text='Название', width=40).grid(row=0, column=0)
+            ttk.Label(frame, text='Процент', width=12).grid(row=0, column=1)
+            ttk.Label(frame, text='Время использования', width=24).grid(row=0, column=2)
+            ttk.Label(frame, text='Откат', width=10).grid(row=0, column=3)
+            ttk.Label(frame, text='Кнопка', width=8).grid(row=0, column=5)
+            frame.pack(fill=X)
+            self.listboxes.append(Listbox(tab, font=font))
+            self.listboxes[i].pack(expand=1, fill=BOTH)
+            self.update_listbox(i)
 
         tab_parent.pack(expand=1, fill='both')
 
         btn_frame = ttk.Frame(self.master)
         btn_frame.pack(side=BOTTOM)
 
-    def add_trigger(self, i):
-        self.trigger_window = Toplevel(self.master)
-        self.app = TriggerWindow(self, i)
+    def save_name(self, window_i):
+        self.window_info[window_i]['name'] = self.names[window_i].get()
+        self.window_info.save()
 
+    def add_trigger(self, window_i):
+        self.trigger_window = Toplevel(self.master)
+        self.app = TriggerWindow(self, window_i)
+
+    def delete_trigger(self, window_i):
+        cs = self.listboxes[window_i].curselection()
+        self.window_info.delete_by_i(window_i, cs[0])
+        self.window_info.save()
+        self.update_listbox(window_i)
+
+    def update_listbox(self, window_i):
+        lb = self.listboxes[window_i]
+        lb.delete(0, END)
+
+        for trigger_name in WindowInfo.ordering:
+            for trigger in self.window_info[window_i]['triggers'][trigger_name]:
+                percent = str(trigger.get('lt_percent', ''))
+                if percent != '':
+                    percent += '%'
+                use_time = str(trigger.get('use_time', ''))
+                if use_time != '':
+                    use_time += 'c'
+                cooldown = str(trigger.get('cooldown', ''))
+                if cooldown != '':
+                    cooldown += 'c'
+                btn = str(trigger.get('btn', ''))
+                if btn != '':
+                    btn = 'F' + btn
+
+                lb.insert(END, self.lb_formatter(TriggerWindow.convert(trigger_name, reverse=True), percent, use_time,
+                                                 cooldown, btn))
+
+    def lb_formatter(self, *args):
+
+        col_lengths = [32, 13, 14, 8]
+        s = ''
+        for i, arg in enumerate(args):
+            s += str(arg)
+            nl = sum(col_lengths[:i + 1])
+            s += ' ' * (nl - len(s))
+        return s
 
 
 class TriggerWindow:
+    TRIGGERS = {'Мое ХП меньше ...%': 'hp_lt',
+                'Мое МП меньше ...%': 'mp_lt',
+                'ХП партийца меньше ...%': 'hp_party_lt',
+                'МП партийца меньше ...%': 'mp_party_lt',
+                'Бафф': 'buff',
+                'Нет цели': 'no_target',
+                'Моб убит': 'mob_dead'}
+
     def __init__(self, root, index):
         self.root = root
         self.index = index
         self.master = root.trigger_window
-        self.master.geometry('280x150')
+        self.master.geometry(f'280x210+{root.master.winfo_x() + 100}+{root.master.winfo_y() + 50}')
         self.master.resizable(False, False)
 
         ttk.Label(self.master, text='Выберите триггер').pack()
         self.trigger = StringVar()
-        trigger_list = ttk.Combobox(self.master, width=30)
-        trigger_list['values'] = ['ХП основы меньше ...%',
-                                  'МП основы меньше ...%',
-                                  'Баф каждые n с.',
-                                  'Нет цели',
-                                  'Моб убит']
+        trigger_list = ttk.Combobox(self.master, width=30, textvariable=self.trigger)
+        trigger_list['values'] = list(self.TRIGGERS.keys())
         trigger_list.pack()
 
-        ttk.Label(self.master, text='Значение если есть').pack()
-        self.value = IntVar()
-        ttk.Entry(self.master, width=10, textvariable=self.value).pack()
-        ttk.Label(self.master, text='Кнопка (F)').pack()
+        frame = ttk.Frame(self.master)
+        self.percent = IntVar()
+        ttk.Entry(frame, width=5, textvariable=self.percent).pack(side=LEFT)
+        ttk.Label(frame, text='%').pack(side=LEFT)
+        frame.pack(pady=10)
+        frame = ttk.Frame(self.master)
+        ttk.Label(frame, text='Кнопка первой панели').pack(side=LEFT)
         self.btn = IntVar()
-        ttk.Entry(self.master, width=10, textvariable=self.btn).pack()
-        ttk.Button(self.master, text='Добавить', command=self.add).pack()
+        ttk.Entry(frame, width=5, textvariable=self.btn).pack(side=LEFT, padx=10)
+        frame.pack(pady=5)
+        frame = ttk.Frame(self.master)
+        ttk.Label(frame, text='Время использования').pack(side=LEFT)
+        self.use_time = IntVar()
+        ttk.Entry(frame, width=5, textvariable=self.use_time).pack(side=LEFT, padx=10)
+        frame.pack(pady=5)
+        frame = ttk.Frame(self.master)
+        ttk.Label(frame, text='Время отката').pack(side=LEFT)
+        self.cooldown = IntVar()
+        ttk.Entry(frame, width=5, textvariable=self.cooldown).pack(side=LEFT, padx=10)
+        frame.pack(pady=5)
+        ttk.Button(self.master, text='Добавить', command=self.add).pack(pady=5)
 
     def add(self):
-        self.root.window_bind.values[self.index]['triggers'].append(
-            {'trigger': self.trigger.get(), 'value': self.value.get(), 'btn': self.btn.get()})
-        self.root.window_bind.save()
-        #self.root.master.destroy()
-        #self.root.__init__(self.root.root)
+        tr = self.convert(self.trigger.get())
+        d = {}
+        if tr == 'hp_lt' or tr == 'mp_lt' or tr == 'hp_party_lt' or tr == 'mp_party_lt':
+            d = {'lt_percent': self.percent.get(), 'btn': self.btn.get(), 'use_time': self.use_time.get(),
+                 'cooldown': self.cooldown.get()}
+        elif tr == 'buff':
+            d = {'btn': self.btn.get(), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get()}
+        elif tr == 'mob_dead':
+            d = {'btn': self.btn.get(), 'use_time': self.use_time.get()}
+        elif tr == 'no_target':
+            d = {'btn': self.btn.get(), 'use_time': self.use_time.get()}
+        self.root.window_info[self.index]['triggers'][tr].append(d)
+        self.root.window_info.save()
+        self.root.update_listbox(self.index)
+        self.master.destroy()
+
+    @classmethod
+    def convert(cls, value, reverse=False):
+        if not reverse:
+            return cls.TRIGGERS[value]
+        for key, trigger in cls.TRIGGERS.items():
+            if trigger == value:
+                return key
 
 
-class WindowBind:
+class WindowInfo:
+    ordering = ['hp_lt', 'mp_lt', 'hp_party_lt', 'mp_party_lt', 'mob_dead', 'buff', 'no_target']
+
     def __init__(self):
-        self.values = [{'name': '', 'triggers': []}]*9
+        self.values = [{'name': '',
+                        'triggers': {'hp_lt': [], 'mp_lt': [], 'hp_party_lt': [], 'mp_party_lt': [], 'mob_dead': [],
+                                     'no_target': [], 'buff': []}}
+                       for x in range(9)]
+        self.load()
 
     def save(self):
         if not os.path.exists('save'):
             os.makedirs('save')
-        with open('save/window_bind.txt', 'w') as f:
-            print(str(self.values), file=f)
+        with open('save/window_bind.l2b', 'wb') as f:
+            pickle.dump(self.values, f)
 
     def load(self):
-        if os.path.exists('save/window_bind.txt'):
-            with open('save/window_bind.txt', 'r') as f:
-                self.values = eval(f.read().strip())
+        if os.path.exists('save/window_bind.l2b'):
+            with open('save/window_bind.l2b', 'rb') as f:
+                try:
+                    self.values = pickle.load(f)
+                except:
+                    pass
+
+    def delete_by_i(self, window_i, del_i):
+        window_tr = self[window_i]['triggers']
+
+        i = 0
+        while del_i > len(self.sum_tr_list(window_i, i)) - 1:
+            i += 1
+        i -= 1
+        if i == 0:
+            window_tr[self.ordering[i]].pop(del_i)
+        elif i > 0:
+            window_tr[self.ordering[i]].pop(del_i - len(self.sum_tr_list(window_i, i - 1)))
+
+    def sum_tr_list(self, window_i, count):
+        window_tr = self[window_i]['triggers']
+        l = []
+        for i in range(min(count, len(self.ordering))):
+            l += window_tr[self.ordering[i]]
+        return l
+
+    def __getitem__(self, item):
+        return self.values[item]
+
+    def __str__(self):
+        return str(self.values)
 
 
 class CalibrationWindow:
