@@ -3,7 +3,7 @@ from ctypes import windll
 import os
 
 from functions import get_screen, get_windows_hwnd
-from l2bot import MainLineageWindow, ValuesMonitor, LineageWindow
+from l2bot import MainLineageWindow, ValuesMonitor, LineageWindow, SerialSender
 
 import tkinter as tk
 from tkinter.font import Font
@@ -15,9 +15,6 @@ import time
 
 user32 = windll.user32
 user32.SetProcessDPIAware()
-
-# WINDOW_NAME = 'Lineage II'
-WINDOW_NAME = 'luki1'
 
 
 class L2BotApp:
@@ -83,8 +80,11 @@ class L2BotApp:
             self.updater_button['text'] = 'Выключить'
             self.monitor = ValuesMonitor(self)
             self.monitor.start()
+            self.serial_sender = SerialSender('COM3')
+            self.serial_sender.start()
         else:
             self.monitor.stop()
+            self.serial_sender.stop()
             self.updater_button['text'] = 'Включить'
             self.hp_label['text'] = 'HP: None'
             self.mp_label['text'] = 'MP: None'
@@ -102,14 +102,15 @@ class L2BotApp:
         self.app = CalibrationWindow(self, method)
 
     def setup_l2_window(self):
-        self.l2_window = MainLineageWindow(get_windows_hwnd('aaa')[0])
+        windows_settings = WindowInfo()
+        self.l2_window = MainLineageWindow(windows_settings, self.serial_sender)
 
     def window_setup_l2_supports(self):
         self.supports_window = Toplevel(self.master)
-        self.app = SupportsSetupWindow(self)
+        self.app = SetupWindowsSettings(self)
 
 
-class SupportsSetupWindow:
+class SetupWindowsSettings:
     def __init__(self, root):
         self.root = root
         self.master = root.supports_window
@@ -125,6 +126,7 @@ class SupportsSetupWindow:
 
         self.listboxes = []
         self.names = []
+        self.actives = []
 
         font = Font(family="Lucida Console", size=10)
 
@@ -138,11 +140,15 @@ class SupportsSetupWindow:
             sv.set(self.window_info[i]['name'])
             self.names.append(sv)
             ttk.Entry(frame, textvariable=sv).pack(side=LEFT, padx=3)
-            ttk.Button(frame, text='Сохранить', command=lambda a=i: self.save_name(a)).pack(side=LEFT, padx=3)
+            cvar = BooleanVar()
+            cvar.set(self.window_info[i]['active'])
+            self.actives.append(cvar)
+            ttk.Checkbutton(frame, text='Активное', variable=cvar, onvalue=1, offvalue=0).pack(side=LEFT)
+            frame.pack(anchor=NW, fill=X, pady=3)
+            ttk.Button(frame, text='Сохранить', command=lambda a=i: self.save(a)).pack(side=LEFT, padx=3)
             ttk.Button(frame, text='Добавить триггер', command=lambda a=i: self.add_trigger(a)).pack(side=LEFT, padx=3)
             ttk.Button(frame, text='Удалить триггер', command=lambda a=i: self.delete_trigger(a)).pack(side=LEFT,
                                                                                                        padx=3)
-            frame.pack(anchor=NW, fill=X, pady=3)
             frame = ttk.Frame(tab)
             ttk.Label(frame, text='Название', width=40).grid(row=0, column=0)
             ttk.Label(frame, text='Процент', width=12).grid(row=0, column=1)
@@ -159,7 +165,8 @@ class SupportsSetupWindow:
         btn_frame = ttk.Frame(self.master)
         btn_frame.pack(side=BOTTOM)
 
-    def save_name(self, window_i):
+    def save(self, window_i):
+        self.window_info[window_i]['active'] = self.actives[window_i].get()
         self.window_info[window_i]['name'] = self.names[window_i].get()
         self.window_info.save()
 
@@ -280,7 +287,7 @@ class WindowInfo:
     ordering = ['hp_lt', 'mp_lt', 'hp_party_lt', 'mp_party_lt', 'mob_dead', 'buff', 'no_target']
 
     def __init__(self):
-        self.values = [{'name': '',
+        self.values = [{'active': 0, 'name': '',
                         'triggers': {'hp_lt': [], 'mp_lt': [], 'hp_party_lt': [], 'mp_party_lt': [], 'mob_dead': [],
                                      'no_target': [], 'buff': []}}
                        for x in range(9)]
