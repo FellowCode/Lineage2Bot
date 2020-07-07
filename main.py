@@ -27,6 +27,7 @@ class L2BotApp:
         self.frame = tk.Frame(self.master)
 
         self.show_main_window()
+        self.setup_l2_window()
 
     def show_main_window(self):
         self.frame.title = 'Bot'
@@ -84,6 +85,7 @@ class L2BotApp:
             self.monitor.start()
             self.serial_sender = SerialSender('COM5')
             self.serial_sender.start()
+            self.l2_window.update_windows_settings()
         else:
             self.monitor.stop()
             self.serial_sender.stop()
@@ -104,8 +106,7 @@ class L2BotApp:
         self.app = CalibrationWindow(self, method)
 
     def setup_l2_window(self):
-        windows_settings = WindowInfo()
-        self.l2_window = MainLineageWindow(windows_settings, self)
+        self.l2_window = MainLineageWindow(self)
 
     def window_setup_l2_supports(self):
         self.supports_window = Toplevel(self.master)
@@ -266,12 +267,10 @@ class TriggerWindow:
         if tr == 'hp_lt' or tr == 'mp_lt' or tr == 'hp_party_lt' or tr == 'mp_party_lt':
             d = {'percent': self.percent.get(), 'btn': self.btn.get(), 'use_time': self.use_time.get(),
                  'cooldown': self.cooldown.get()}
-        elif tr == 'buff':
+        elif tr == 'buff' or tr == 'mob_dead' or tr == 'no_target':
             d = {'btn': self.btn.get(), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get()}
-        elif tr == 'mob_dead' or tr == 'no_target':
-            d = {'btn': self.btn.get(), 'cooldown': self.cooldown.get()}
         elif tr == 'target_hp':
-            d = {'btn': self.btn.get(), 'cooldown': self.cooldown.get(), 'percent': self.percent.get()}
+            d = {'btn': self.btn.get(), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get(), 'percent': self.percent.get()}
         self.root.window_info[self.index]['triggers'][tr].append(d)
         self.root.window_info.save()
         self.root.update_listbox(self.index)
@@ -443,8 +442,11 @@ class CalibrationWindow:
         except:
             pass
 
+import win32gui, win32con
 
 if __name__ == '__main__':
+    win32gui.SystemParametersInfo(win32con.SPI_SETFOREGROUNDLOCKTIMEOUT, 0,
+                                  win32con.SPIF_SENDWININICHANGE | win32con.SPIF_UPDATEINIFILE)
     root = tk.Tk()
     app = L2BotApp(root)
     root.mainloop()
