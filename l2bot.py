@@ -10,6 +10,9 @@ import serial
 import win32gui
 
 from windows_settings import WindowInfo
+import win32com.client
+
+shell = win32com.client.Dispatch("WScript.Shell")
 
 
 class ValuesMonitor(Thread):
@@ -23,7 +26,7 @@ class ValuesMonitor(Thread):
         while self.work:
             self.app.l2_window.update()
             self.app.update_values()
-            sleep(1)
+            sleep(2)
 
     def stop(self):
         self.work = False
@@ -85,15 +88,55 @@ class SerialSender(Thread):
 class LineageWindow:
     from threading import Timer
 
-    def __init__(self, window_settings, app):
+    def __init__(self, window_settings, app, window_i=0):
+        self.window_i = window_i
         self.app = app
         self.hwnd = get_windows_hwnd(window_settings['name'])[0]
         self.window_settings = window_settings
 
     def click_btn(self, btn_code):
-        win32gui.SetForegroundWindow(self.hwnd)
-        sleep(0.1)
+        print('click_btn', self.window_i, btn_code)
+        self.set_fg_window()
         self.app.serial_sender.send(btn_code)
+
+    def set_fg_window(self):
+        print('set_fg_window', self.window_i)
+        shell.SendKeys('%')
+        win32gui.SetForegroundWindow(self.hwnd)
+
+    def triggers_exec(self, hp, mp, target_hp, last_target_hp, party_hps, party_mps):
+        #print('trigger exec', self.window_i)
+        if self.window_i > 0:
+            hp, party_hps[self.window_i-1] = party_hps[self.window_i-1], hp
+            mp, party_mps[self.window_i-1] = party_mps[self.window_i-1], mp
+        for trigger_name in WindowInfo.ordering:
+            triggers = self.window_settings['triggers'][trigger_name]
+            for trigger in triggers:
+                if trigger_name == 'hp_lt' and trigger['percent'] > hp:
+                    self.click_btn(trigger['btn'])
+                    print('trigger', 'hp_lt')
+                if trigger_name == 'mp_lt' and trigger['percent'] > mp:
+                    self.click_btn(trigger['btn'])
+                    print('trigger', 'mp_lt')
+                if trigger_name == 'hp_party_lt' and trigger['percent'] > min(party_hps):
+                    min_hp = min(party_hps)
+                    p_index = party_hps.index(min_hp)
+                    #self.click_btn(14+p_index)
+                    #sleep(0.2)
+                    self.click_btn(trigger['btn'])
+                    print('trigger', 'hp_party_lt')
+                if trigger_name == 'mob_dead' and target_hp == 0 and last_target_hp > 0:
+                    self.click_btn(trigger['btn'])
+                    print('trigger', 'mob_dead')
+                if trigger_name == 'no_target' and target_hp == 0 and last_target_hp == 0:
+                    self.click_btn(trigger['btn'])
+                    print('trigger', 'no_target')
+                if trigger_name == 'target_hp' and target_hp > trigger['percent']:
+                    self.click_btn(trigger['btn'])
+                    print('trigger', 'target_hp')
+                if trigger_name == 'buff' and trigger.get('ready', True):
+                    self.click_btn(trigger['btn'])
+                    trigger['ready'] = False
 
 
 class MainLineageWindow(LineageWindow):
@@ -108,7 +151,7 @@ class MainLineageWindow(LineageWindow):
 
         for i in range(1, 9, 1):
             if windows_settings[i]['active'] == 1:
-                self.support_windows.append(LineageWindow(windows_settings[i], app))
+                self.support_windows.append(LineageWindow(windows_settings[i], app, window_i=i))
 
         super().__init__(windows_settings[0], app)
         self.last_target_hp = 0
@@ -126,10 +169,6 @@ class MainLineageWindow(LineageWindow):
 
     def update_screen(self):
         self.update_window_info()
-        try:
-            win32gui.SetForegroundWindow(self.hwnd)
-        except:
-            pass
         self.screen = get_screen().crop(self.box)
 
     def save_screen(self):
@@ -209,6 +248,8 @@ class MainLineageWindow(LineageWindow):
 
     def update(self):
         """ Bot Loop """
+        self.set_fg_window()
+        sleep(0.1)
         self.update_screen()
         if hasattr(self, 'hp_line'):
             self.hp = self.get_percent_value(self.hp_line, GraciaColors.hp)
@@ -216,25 +257,19 @@ class MainLineageWindow(LineageWindow):
             self.mp = self.get_percent_value(self.mp_line, GraciaColors.mp)
         if hasattr(self, 'target_hp_line'):
             self.target_hp = self.get_percent_value(self.target_hp_line, GraciaColors.target_hp, digits_on_line=False)
+        self.party_hps = []
+        if hasattr(self, 'party_hp_lines'):
+            for line in self.party_hp_lines:
+                self.party_hps.append(self.get_percent_value(line, GraciaColors.target_hp, digits_on_line=False))
+        self.party_mps = []
+        if hasattr(self, 'party_mp_lines'):
+            for line in self.party_mp_lines:
+                self.party_mps.append(self.get_percent_value(line, GraciaColors.mp, digits_on_line=False))
 
-        for trigger_name in WindowInfo.ordering:
-            triggers = self.window_settings['triggers'][trigger_name]
-            for trigger in triggers:
-                if trigger_name == 'hp_lt' and trigger['percent'] > self.hp:
-                    self.click_btn(trigger['btn'])
-                    print('trigger', 'hp_lt')
-                if trigger_name == 'mp_lt' and trigger['percent'] > self.mp:
-                    self.click_btn(trigger['btn'])
-                    print('trigger', 'mp_lt')
-                if trigger_name == 'mob_dead' and self.target_hp == 0 and self.last_target_hp > 0:
-                    self.click_btn(trigger['btn'])
-                    print('trigger', 'mob_dead')
-                if trigger_name == 'no_target' and self.target_hp == 0 and self.last_target_hp == 0:
-                    self.click_btn(trigger['btn'])
-                    print('trigger', 'no_target')
-                if trigger_name == 'target_hp' and self.target_hp > trigger['percent']:
-                    self.click_btn(trigger['btn'])
-                    print('trigger', 'target_hp')
+        self.triggers_exec(self.hp, self.mp, self.target_hp, self.last_target_hp, self.party_hps, self.party_mps)
+
+        for sup_win in self.support_windows:
+            sup_win.triggers_exec(self.hp, self.mp, self.target_hp, self.last_target_hp, self.party_hps, self.party_mps)
 
         self.last_target_hp = self.target_hp
 
