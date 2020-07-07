@@ -7,3 +7,4 @@ pynput
 desktopmagic
 numpy
 opencv-python
+pyserial
