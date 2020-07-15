@@ -34,7 +34,7 @@ class WindowInfo:
         if i == 0:
             window_tr[self.ordering[i]].pop(del_i)
         elif i > 0:
-            window_tr[self.ordering[i]].pop(del_i - len(self.sum_tr_list(window_i, i - 1)))
+            window_tr[self.ordering[i]].pop(del_i - len(self.sum_tr_list(window_i, i)))
 
     def sum_tr_list(self, window_i, count):
         window_tr = self[window_i]['triggers']

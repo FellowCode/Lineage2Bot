@@ -21,11 +21,15 @@ class ValuesMonitor(Thread):
     def __init__(self, app):
         super().__init__()
         self.app = app
+        self.pause = False
 
     def run(self):
         while self.work:
-            self.app.l2_window.update()
-            self.app.update_values()
+            if not self.pause:
+                self.app.l2_window.update()
+                self.app.update_values()
+            else:
+                sleep(0.3)
 
     def stop(self):
         self.work = False
@@ -93,6 +97,7 @@ class LineageWindow:
         self.app = app
         self.hwnd = get_windows_hwnd(self.window_settings['name'])[0]
         self.using_skill = False
+        self.target_change = False
 
     def click_btn(self, btn_code):
         print('click_btn', self.window_i, btn_code)
@@ -137,17 +142,18 @@ class LineageWindow:
                     self.click_btn(trigger['btn'])
                     self.use_cooldown_skill(trigger)
                     print('trigger', 'mp_party_lt')
-                if trigger_name == 'mob_dead' and target_hp == 0 and last_target_hp > 0 and not self.using_skill:
+                if trigger_name == 'mob_dead' and target_hp == 0 and last_target_hp > 0 and trigger.get('ready', True) and not self.using_skill:
                     self.click_btn(trigger['btn'])
                     self.use_cooldown_skill(trigger)
                     print('trigger', 'mob_dead')
-                if trigger_name == 'no_target' and target_hp == 0 and last_target_hp == 0 and not self.using_skill:
+                if trigger_name == 'no_target' and target_hp == 0 and last_target_hp == 0 and trigger.get('ready', True) and not self.using_skill:
                     self.click_btn(trigger['btn'])
                     self.use_cooldown_skill(trigger)
                     print('trigger', 'no_target')
-                if trigger_name == 'target_hp' and target_hp > trigger['percent'] and not self.using_skill:
+                if trigger_name == 'target_hp' and target_hp > trigger['percent'] and trigger.get('ready', True) and not self.using_skill and self.target_change:
                     self.click_btn(trigger['btn'])
                     self.use_cooldown_skill(trigger)
+                    self.target_change = False
                     print('trigger', 'target_hp')
                 if trigger_name == 'buff' and trigger.get('ready', True) and not self.using_skill:
                     self.click_btn(trigger['btn'])
@@ -156,7 +162,6 @@ class LineageWindow:
 
     def use_skill(self, trigger):
         def used(self):
-            print('skill used')
             self.using_skill = False
 
         if trigger.get('use_time', 0) > 0:
@@ -167,7 +172,6 @@ class LineageWindow:
         self.use_skill(trigger)
 
         def used(trigger):
-            print('skill ready')
             trigger['ready'] = True
 
         if trigger.get('cooldown', 0) > 0:
@@ -200,6 +204,8 @@ class MainLineageWindow(LineageWindow):
         super().__init__(self.windows_settings[0], app)
         self.last_target_hp = 0
         self.update_window_info()
+        self.thp_100_count = 0
+
 
     def update_window_info(self):
         rect = win32gui.GetWindowRect(self.hwnd)
@@ -314,6 +320,17 @@ class MainLineageWindow(LineageWindow):
         if hasattr(self, 'party_mp_lines'):
             for line in self.party_mp_lines:
                 self.party_mps.append(self.get_percent_value(line, GraciaColors.mp, digits_on_line=False))
+
+        if self.target_hp == 100:
+            self.thp_100_count += 1
+        if self.thp_100_count == 5:
+            self.target_hp = 0
+            self.last_target_hp = 0
+        if self.target_hp < 100:
+            self.thp_100_count = 0
+
+        if self.target_hp == 0:
+            self.target_change = True
 
         self.triggers_exec(self.hp, self.mp, self.target_hp, self.last_target_hp, self.party_hps, self.party_mps)
 

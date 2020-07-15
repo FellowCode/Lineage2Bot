@@ -14,6 +14,10 @@ void setup() {
   digitalWrite(1, HIGH);
   delay(1000);
   digitalWrite(1, LOW);
+  DigiKeyboard.sendKeyStroke(KEY_1);
+  delay(1000);
+  DigiKeyboard.sendKeyStroke(KEY_1);
+  delay(1000);
 }
 
 void loop() {

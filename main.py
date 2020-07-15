@@ -27,57 +27,54 @@ class L2BotApp:
         self.frame = tk.Frame(self.master)
 
         self.show_main_window()
-        self.setup_l2_window()
 
     def show_main_window(self):
         self.frame.title = 'Bot'
-        self.master.geometry('200x340+2200+600')
+        self.master.geometry('200x170')
         self.master.resizable(False, False)
 
-        window_name_btn = Button(self.frame, text='Подключить окна', height=1)
-        window_name_btn.place(relx=0.05, y=10, relwidth=0.9)
-        window_name_btn.bind('<ButtonRelease-1>', lambda event: self.setup_l2_window())
+        # window_name_btn = Button(self.frame, text='Подключить окна', height=1)
+        # window_name_btn.place(relx=0.05, y=10, relwidth=0.9)
+        # window_name_btn.bind('<ButtonRelease-1>', lambda event: self.setup_l2_window())
 
-        auto_calibration_btn = Button(self.frame, text='Настройки окон', height=1)
-        auto_calibration_btn.place(relx=0.05, y=55, relwidth=0.9)
-        auto_calibration_btn.bind('<ButtonRelease-1>', lambda event: self.window_setup_l2_supports())
+        ttk.Button(self.frame, text='Настройки окон', command=self.window_setup_l2_supports).pack(fill=X)
 
-        auto_calibration_btn = Button(self.frame, text='Автокалибровка', height=1)
-        auto_calibration_btn.place(relx=0.05, y=85, relwidth=0.9)
-        auto_calibration_btn.bind('<ButtonRelease-1>', lambda event: self.calibration_window_init('auto'))
+        ttk.Button(self.frame, text='Автокалибровка', command=lambda:self.calibration_window_init('auto')).pack(fill=X)
 
-        set_hp_button = Button(self.frame, text='Указать ХП', height=1)
-        set_hp_button.place(relx=0.05, y=115, relwidth=0.9)
-        set_hp_button.bind('<ButtonRelease-1>', lambda event: self.calibration_window_init('manual_hp'))
+        # set_hp_button = Button(self.frame, text='Указать ХП', height=1)
+        # set_hp_button.place(relx=0.05, y=115, relwidth=0.9)
+        # set_hp_button.bind('<ButtonRelease-1>', lambda event: self.calibration_window_init('manual_hp'))
 
-        set_mp_button = Button(self.frame, text='Указать МП', height=1)
-        set_mp_button.place(relx=0.05, y=145, relwidth=0.9)
-        set_mp_button.bind('<ButtonRelease-1>', lambda event: self.calibration_window_init('manual_mp'))
+        # set_mp_button = Button(self.frame, text='Указать МП', height=1)
+        # set_mp_button.place(relx=0.05, y=145, relwidth=0.9)
+        # set_mp_button.bind('<ButtonRelease-1>', lambda event: self.calibration_window_init('manual_mp'))
 
-        set_target_hp_button = Button(self.frame, text='Указать ХП цели', height=1)
-        set_target_hp_button.place(relx=0.05, y=175, relwidth=0.9)
-        set_target_hp_button.bind('<ButtonRelease-1>', lambda event: self.calibration_window_init('manual_target_hp'))
+        # set_target_hp_button = Button(self.frame, text='Указать ХП цели', height=1)
+        # set_target_hp_button.place(relx=0.05, y=175, relwidth=0.9)
+        # set_target_hp_button.bind('<ButtonRelease-1>', lambda event: self.calibration_window_init('manual_target_hp'))
 
-        screen_btn = Button(self.frame, text='Сделать скриншот', height=1)
-        screen_btn.place(relx=0.05, y=205, relwidth=0.9)
-        screen_btn.bind('<ButtonRelease-1>', lambda ev: self.l2_window.save_screen())
+        # screen_btn = Button(self.frame, text='Сделать скриншот', height=1)
+        # screen_btn.place(relx=0.05, y=205, relwidth=0.9)
+        # screen_btn.bind('<ButtonRelease-1>', lambda ev: self.l2_window.save_screen())
 
-        self.updater_button = Button(self.frame, text='Включить', height=1)
-        self.updater_button.place(relx=0.05, y=235, relwidth=0.9)
-        self.updater_button.bind('<ButtonRelease-1>', self.change_cycle_update)
+        self.updater_button = ttk.Button(self.frame, text='Включить', command=self.change_cycle_update)
+        self.updater_button.pack(fill=X)
 
-        self.hp_label = Label(text='HP: None')
-        self.hp_label.place(relx=0.05, y=270, relwidth=0.9)
+        self.pause_button = ttk.Button(self.frame, text='Пауза', command=self.change_pause)
+        self.pause_button.pack(fill=X)
 
-        self.mp_label = Label(text='MP: None')
-        self.mp_label.place(relx=0.05, y=290, relwidth=0.9)
+        self.hp_label = ttk.Label(self.frame, text='HP: None')
+        self.hp_label.pack(fill=X)
 
-        self.target_hp_label = Label(text='T_HP: None')
-        self.target_hp_label.place(relx=0.05, y=310, relwidth=0.9)
+        self.mp_label = ttk.Label(self.frame, text='MP: None')
+        self.mp_label.pack(fill=X)
+
+        self.target_hp_label = ttk.Label(self.frame, text='T_HP: None')
+        self.target_hp_label.pack(fill=X)
 
         self.frame.place(x=0, y=0, relwidth=1, relheight=1)
 
-    def change_cycle_update(self, event):
+    def change_cycle_update(self):
         self.cycle_update = not self.cycle_update
         if self.cycle_update:
             self.updater_button['text'] = 'Выключить'
@@ -94,6 +91,9 @@ class L2BotApp:
             self.mp_label['text'] = 'MP: None'
             self.target_hp_label['text'] = 'T_HP: None'
 
+    def change_pause(self):
+        self.monitor.pause = not self.monitor.pause
+
     def update_values(self):
         if self.cycle_update:
             self.hp_label['text'] = 'HP: %d' % self.l2_window.hp
@@ -102,6 +102,7 @@ class L2BotApp:
             self.master.after(500, self.update_values)
 
     def calibration_window_init(self, method):
+        self.setup_l2_window()
         self.calibration_window = Toplevel(self.master)
         self.app = CalibrationWindow(self, method)
 
@@ -224,7 +225,8 @@ class TriggerWindow:
                 'Бафф': 'buff',
                 'Нет цели': 'no_target',
                 'Моб убит': 'mob_dead',
-                'ХП цели больше ...%': 'target_hp'}
+                'ХП цели больше ...%': 'target_hp',
+                'Цель изменена': 'target_change'}
 
     def __init__(self, root, index):
         self.root = root
@@ -267,7 +269,7 @@ class TriggerWindow:
         if tr == 'hp_lt' or tr == 'mp_lt' or tr == 'hp_party_lt' or tr == 'mp_party_lt':
             d = {'percent': self.percent.get(), 'btn': self.btn.get(), 'use_time': self.use_time.get(),
                  'cooldown': self.cooldown.get()}
-        elif tr == 'buff' or tr == 'mob_dead' or tr == 'no_target':
+        elif tr == 'buff' or tr == 'mob_dead' or tr == 'no_target' or tr == 'target_change':
             d = {'btn': self.btn.get(), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get()}
         elif tr == 'target_hp':
             d = {'btn': self.btn.get(), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get(), 'percent': self.percent.get()}
@@ -438,7 +440,7 @@ class CalibrationWindow:
             for i, php_line in enumerate(self.l2_window.party_hp_lines):
                 self.party_hp_lines.append(self.canvas.create_line(php_line, width=2, fill='white'))
                 self.party_mp_lines.append(
-                    self.canvas.create_line(self.l2_window.party_mp_lines, width=2, fill='white'))
+                    self.canvas.create_line(self.l2_window.party_mp_lines[i], width=2, fill='white'))
         except:
             pass
 
