@@ -1,11 +1,14 @@
+#define FLAG_PIN 9
+#define PULSE_PIN 5
+
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
 
-  pinMode(A4, OUTPUT); //data flag
-  digitalWrite(A4, LOW);
-  pinMode(A5, OUTPUT); //pulse
-  digitalWrite(A5, LOW);
+  pinMode(FLAG_PIN, OUTPUT); //data flag
+  digitalWrite(FLAG_PIN, LOW);
+  pinMode(PULSE_PIN, OUTPUT); //pulse
+  digitalWrite(PULSE_PIN, LOW);
 }
 
 void loop() {

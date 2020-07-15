@@ -1,12 +1,15 @@
 #include <DigiKeyboard.h>
 
-byte rcv;
+#define FLAG_PIN 0
+#define PULSE_PIN 2
+
+int rcv;
 boolean readData = false;
 boolean pulse = false;
 
 void setup() {
-  pinMode(0, INPUT); //flag
-  pinMode(2, INPUT); //pulse
+  pinMode(FLAG_PIN, INPUT); //flag
+  pinMode(PULSE_PIN, INPUT); //pulse
   pinMode(1, OUTPUT); //led
   digitalWrite(1, HIGH);
   delay(1000);
@@ -15,16 +18,16 @@ void setup() {
 
 void loop() {
   digitalWrite(1, digitalRead(2));
-  if (digitalRead(0) == 1){
+  if (digitalRead(FLAG_PIN) == 1){
     if (!readData){
       readData = true;
       rcv = 0;
     }
-    if (!pulse && digitalRead(2) == 1){
+    if (!pulse && digitalRead(PULSE_PIN) == 1){
       rcv++;
       pulse = true;
     }
-    if (digitalRead(2) == 0){
+    if (digitalRead(PULSE_PIN) == 0){
       pulse = false;
     }
   } else {
@@ -35,7 +38,7 @@ void loop() {
   }
 }
 
-void onReceive(byte data){
+void onReceive(int data){
   switch (data){
     case 1: DigiKeyboard.sendKeyStroke(KEY_F1); break;
     case 2: DigiKeyboard.sendKeyStroke(KEY_F2); break;
@@ -56,5 +59,11 @@ void onReceive(byte data){
     case 17: DigiKeyboard.sendKeyStroke(KEY_5); break;
     case 18: DigiKeyboard.sendKeyStroke(KEY_6); break;
     case 19: DigiKeyboard.sendKeyStroke(KEY_7); break;
+    case 20: DigiKeyboard.sendKeyStroke(KEY_8); break;
+    case 21: DigiKeyboard.sendKeyStroke(KEY_9); break;
+    case 22: DigiKeyboard.sendKeyStroke(KEY_5, MOD_GUI_LEFT); break;
+    case 23: DigiKeyboard.sendKeyStroke(KEY_6, MOD_GUI_LEFT); break;
+    case 24: DigiKeyboard.sendKeyStroke(KEY_7, MOD_GUI_LEFT); break;
+    case 25: DigiKeyboard.sendKeyStroke(KEY_8, MOD_GUI_LEFT); break;
   }
 }
