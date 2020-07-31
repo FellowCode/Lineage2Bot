@@ -199,9 +199,7 @@ class SetupWindowsSettings:
                 cooldown = str(trigger.get('cooldown', ''))
                 if cooldown != '':
                     cooldown += 'c'
-                btn = str(trigger.get('btn', ''))
-                if btn != '':
-                    btn = 'F' + btn
+                btn = trigger.get('btn', '')
 
                 lb.insert(END, self.lb_formatter(TriggerWindow.convert(trigger_name, reverse=True), percent, use_time,
                                                  cooldown, btn))
@@ -267,12 +265,12 @@ class TriggerWindow:
         tr = self.convert(self.trigger.get())
         d = {}
         if tr == 'hp_lt' or tr == 'mp_lt' or tr == 'hp_party_lt' or tr == 'mp_party_lt':
-            d = {'percent': self.percent.get(), 'btn': self.btn.get(), 'use_time': self.use_time.get(),
+            d = {'percent': self.percent.get(), 'btn': 'F'+str(self.btn.get()), 'use_time': self.use_time.get(),
                  'cooldown': self.cooldown.get()}
         elif tr == 'buff' or tr == 'mob_dead' or tr == 'no_target' or tr == 'target_change':
-            d = {'btn': self.btn.get(), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get()}
+            d = {'btn': 'F'+str(self.btn.get()), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get()}
         elif tr == 'target_hp':
-            d = {'btn': self.btn.get(), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get(), 'percent': self.percent.get()}
+            d = {'btn': 'F'+str(self.btn.get()), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get(), 'percent': self.percent.get()}
         self.root.window_info[self.index]['triggers'][tr].append(d)
         self.root.window_info.save()
         self.root.update_listbox(self.index)

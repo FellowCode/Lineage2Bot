@@ -117,8 +117,8 @@ class LineageWindow:
         if self.window_i > 0:
             party_hps.insert(0, hp)
             party_mps.insert(0, mp)
-            hp = party_hps.pop(self.window_i), hp
-            mp = party_mps.pop(self.window_i), mp
+            hp = party_hps.pop(self.window_i)
+            mp = party_mps.pop(self.window_i)
         for trigger_name in WindowInfo.ordering:
             triggers = self.window_settings['triggers'][trigger_name]
             for trigger in triggers:
@@ -132,7 +132,7 @@ class LineageWindow:
                     print('trigger', 'mp_lt')
                 if trigger_name == 'hp_party_lt' and trigger['percent'] > min(party_hps) and trigger.get('ready', True) and not self.using_skill:
                     p_index = self.get_party_index(party_hps)
-                    self.click_btn(14+p_index)
+                    self.click_btn(p_index)
                     self.click_btn(trigger['btn'])
                     self.use_cooldown_skill(trigger)
                     print('trigger', 'hp_party_lt')
