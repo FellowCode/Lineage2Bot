@@ -8,3 +8,4 @@ desktopmagic
 numpy
 opencv-python
 pyserial
+pyscreenshot

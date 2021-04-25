@@ -3,6 +3,9 @@ from PIL import ImageGrab, ImageDraw, Image
 import cv2
 from numpy import *
 import win32gui
+import pyscreenshot
+import PIL
+
 
 window_substring = 'Lineage II'
 

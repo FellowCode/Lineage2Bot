@@ -1,12 +1,12 @@
 import os, pickle
 
 class WindowInfo:
-    ordering = ['hp_lt', 'mp_lt', 'hp_party_lt', 'mp_party_lt', 'mob_dead', 'buff', 'no_target', 'target_hp']
+    ordering = ['hp_lt', 'mp_lt', 'hp_party_lt', 'mp_party_lt', 'mob_dead', 'buff', 'no_target', 'target_hp', 'target_hp_lt']
 
     def __init__(self):
         self.values = [{'active': 0, 'name': '',
                         'triggers': {'hp_lt': [], 'mp_lt': [], 'hp_party_lt': [], 'mp_party_lt': [], 'mob_dead': [],
-                                     'no_target': [], 'buff': [], 'target_hp': []}}
+                                     'no_target': [], 'buff': [], 'target_hp': [], 'target_hp_lt': []}}
                        for x in range(9)]
         self.load()
 

@@ -39,7 +39,7 @@ class L2BotApp:
 
         ttk.Button(self.frame, text='Настройки окон', command=self.window_setup_l2_supports).pack(fill=X)
 
-        ttk.Button(self.frame, text='Автокалибровка', command=lambda:self.calibration_window_init('auto')).pack(fill=X)
+        ttk.Button(self.frame, text='Автокалибровка', command=lambda: self.calibration_window_init('auto')).pack(fill=X)
 
         # set_hp_button = Button(self.frame, text='Указать ХП', height=1)
         # set_hp_button.place(relx=0.05, y=115, relwidth=0.9)
@@ -224,13 +224,14 @@ class TriggerWindow:
                 'Нет цели': 'no_target',
                 'Моб убит': 'mob_dead',
                 'ХП цели больше ...%': 'target_hp',
+                'ХП цели меньше ...%': 'target_hp_lt',
                 'Цель изменена': 'target_change'}
 
     def __init__(self, root, index):
         self.root = root
         self.index = index
         self.master = root.trigger_window
-        self.master.geometry(f'280x210+{root.master.winfo_x() + 100}+{root.master.winfo_y() + 50}')
+        self.master.geometry(f'280x250+{root.master.winfo_x() + 100}+{root.master.winfo_y() + 50}')
         self.master.resizable(False, False)
 
         ttk.Label(self.master, text='Выберите триггер').pack()
@@ -259,18 +260,21 @@ class TriggerWindow:
         self.cooldown = IntVar()
         ttk.Entry(frame, width=5, textvariable=self.cooldown).pack(side=LEFT, padx=10)
         frame.pack(pady=5)
+        self.cyclic = BooleanVar()
+        ttk.Checkbutton(self.master, text='Циклично', variable=self.cyclic, onvalue=1, offvalue=0).pack(pady=5)
         ttk.Button(self.master, text='Добавить', command=self.add).pack(pady=5)
 
     def add(self):
         tr = self.convert(self.trigger.get())
         d = {}
         if tr == 'hp_lt' or tr == 'mp_lt' or tr == 'hp_party_lt' or tr == 'mp_party_lt':
-            d = {'percent': self.percent.get(), 'btn': 'F'+str(self.btn.get()), 'use_time': self.use_time.get(),
-                 'cooldown': self.cooldown.get()}
+            d = {'percent': self.percent.get(), 'btn': 'F' + str(self.btn.get()), 'use_time': self.use_time.get(),
+                 'cooldown': self.cooldown.get(), 'cyclic': self.cyclic.get()}
         elif tr == 'buff' or tr == 'mob_dead' or tr == 'no_target' or tr == 'target_change':
-            d = {'btn': 'F'+str(self.btn.get()), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get()}
-        elif tr == 'target_hp':
-            d = {'btn': 'F'+str(self.btn.get()), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get(), 'percent': self.percent.get()}
+            d = {'btn': 'F' + str(self.btn.get()), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get()}
+        elif tr == 'target_hp' or tr == 'target_hp_lt':
+            d = {'btn': 'F' + str(self.btn.get()), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get(),
+                 'percent': self.percent.get(), 'cyclic': self.cyclic.get()}
         self.root.window_info[self.index]['triggers'][tr].append(d)
         self.root.window_info.save()
         self.root.update_listbox(self.index)
@@ -441,6 +445,7 @@ class CalibrationWindow:
                     self.canvas.create_line(self.l2_window.party_mp_lines[i], width=2, fill='white'))
         except:
             pass
+
 
 import win32gui, win32con
 

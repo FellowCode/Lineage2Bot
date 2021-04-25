@@ -11,6 +11,8 @@ import win32gui
 
 from windows_settings import WindowInfo
 import win32com.client
+import uuid
+import copy
 
 shell = win32com.client.Dispatch("WScript.Shell")
 
@@ -73,15 +75,17 @@ class SerialSender(Thread):
     def run(self):
         while self.work:
             if self.msg:
+                print(self.msg)
                 self.serial.write(self.msg)
                 self.msg = None
             sleep(0.01)
 
     def send(self, msg):
-        self.msg = str(str(msg) + '\n').encode()
+        self.msg = str(str(msg[1:]) + '\n').encode()
 
     def connect(self):
         self.serial = serial.Serial(self.com, 115200, timeout=0)
+        pass
 
     def stop(self):
         self.work = False
@@ -98,12 +102,23 @@ class LineageWindow:
         self.hwnd = get_windows_hwnd(self.window_settings['name'])[0]
         self.using_skill = False
         self.target_change = False
+        self.cyclic_uid = ''
 
-    def click_btn(self, btn_code):
+    def click_btn(self, btn_code, cyclic=False):
         print('click_btn', self.window_i, btn_code)
-        self.set_fg_window()
-        self.app.serial_sender.send(btn_code)
+        # self.set_fg_window()
+        self.cyclic_uid = uuid.uuid4().hex
+
+        if False:
+            Thread(target=self.cyclic_click, args=(btn_code, copy.copy(self.cyclic_uid)), daemon=True).start()
+        else:
+            self.app.serial_sender.send(btn_code)
         sleep(0.1)
+
+    def cyclic_click(self, btn_code, uid):
+        while uid == self.cyclic_uid:
+            self.app.serial_sender.send(btn_code)
+            sleep(.05)
 
     def set_fg_window(self):
         shell.SendKeys('%')
@@ -150,9 +165,14 @@ class LineageWindow:
                     self.click_btn(trigger['btn'])
                     self.use_cooldown_skill(trigger)
                     print('trigger', 'no_target')
-                if trigger_name == 'target_hp' and target_hp > trigger['percent'] and trigger.get('ready', True) and not self.using_skill and self.target_change:
-                    self.click_btn(trigger['btn'])
+                if trigger_name == 'target_hp' and target_hp > trigger['percent'] and trigger.get('ready', True) and not self.using_skill:
+                    self.click_btn(trigger['btn'], cyclic=trigger.get('cyclic', False))
                     self.use_cooldown_skill(trigger)
+                    self.target_change = False
+                    print('trigger', 'target_hp')
+                if trigger_name == 'target_hp_lt' and target_hp < trigger['percent'] and trigger.get('ready', True) and not self.using_skill:
+                    self.click_btn(trigger['btn'], cyclic=trigger.get('cyclic', False))
+                    self.use_cooldown_skill(trigger, )
                     self.target_change = False
                     print('trigger', 'target_hp')
                 if trigger_name == 'buff' and trigger.get('ready', True) and not self.using_skill:
@@ -225,7 +245,7 @@ class MainLineageWindow(LineageWindow):
 
     def update_screen(self):
         self.update_window_info()
-        self.set_fg_window()
+        # self.set_fg_window()
         self.screen = get_screen().crop(self.box)
 
     def save_screen(self):
@@ -261,8 +281,8 @@ class MainLineageWindow(LineageWindow):
         screen_cv = img_to_cv(self.screen)
         processes = []
         processes.append(Process(target=self.get_template_pos, args=(stat_pos, screen_cv, 'templates\\hp.jpg')))
-        processes.append(Process(target=self.get_template_pos, args=(target_pos, screen_cv, 'templates\\target.jpg')))
-        processes.append(Process(target=self.get_template_pos, args=(party_pos, screen_cv, 'templates\\party.jpg')))
+        processes.append(Process(target=self.get_template_pos, args=(target_pos, screen_cv, 'templates\\target_scryde.jpg')))
+        processes.append(Process(target=self.get_template_pos, args=(party_pos, screen_cv, 'templates\\party_scryde.jpg')))
 
         for proc in processes:
             proc.start()
@@ -287,19 +307,19 @@ class MainLineageWindow(LineageWindow):
             target_start_pos = (self.target_pos[0] + 40, self.target_pos[1])
             self.target_hp_line = self.get_value_line(target_start_pos, 100, GraciaColors.target_hp)
 
-        if hasattr(self, 'party_pos'):
-            party_start_pos = (self.party_pos[0] + 40, self.party_pos[1])
-            self.party_hp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.target_hp)]
-            self.party_mp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.mp)]
-            while True:
-                party_start_pos = (party_start_pos[0], self.party_hp_lines[-1][1] + 20)
-                self.party_hp_lines.append(self.get_value_line(party_start_pos, 100, GraciaColors.target_hp))
-                self.party_mp_lines.append(self.get_value_line(party_start_pos, 100, GraciaColors.mp))
-                if not self.party_hp_lines[-1] or not self.party_mp_lines[-1]:
-                    del self.party_hp_lines[-1]
-                    del self.party_mp_lines[-1]
-                    break
-            print(self.party_mp_lines)
+        # if hasattr(self, 'party_pos'):
+        #     party_start_pos = (self.party_pos[0] + 40, self.party_pos[1])
+        #     self.party_hp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.target_hp)]
+        #     self.party_mp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.mp)]
+        #     while True:
+        #         party_start_pos = (party_start_pos[0], self.party_hp_lines[-1][1] + 20)
+        #         self.party_hp_lines.append(self.get_value_line(party_start_pos, 100, GraciaColors.target_hp))
+        #         self.party_mp_lines.append(self.get_value_line(party_start_pos, 100, GraciaColors.mp))
+        #         if not self.party_hp_lines[-1] or not self.party_mp_lines[-1]:
+        #             del self.party_hp_lines[-1]
+        #             del self.party_mp_lines[-1]
+        #             break
+        #     print(self.party_mp_lines)
 
         print('calibration time:', time.time() - start_time)
 
@@ -311,7 +331,7 @@ class MainLineageWindow(LineageWindow):
         if hasattr(self, 'mp_line'):
             self.mp = self.get_percent_value(self.mp_line, GraciaColors.mp)
         if hasattr(self, 'target_hp_line'):
-            self.target_hp = self.get_percent_value(self.target_hp_line, GraciaColors.target_hp, digits_on_line=False)
+            self.target_hp = self.get_percent_value(self.target_hp_line, GraciaColors.target_hp)
         self.party_hps = []
         if hasattr(self, 'party_hp_lines'):
             for line in self.party_hp_lines:
