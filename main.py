@@ -260,21 +260,15 @@ class TriggerWindow:
         self.cooldown = IntVar()
         ttk.Entry(frame, width=5, textvariable=self.cooldown).pack(side=LEFT, padx=10)
         frame.pack(pady=5)
-        self.cyclic = BooleanVar()
-        ttk.Checkbutton(self.master, text='Циклично', variable=self.cyclic, onvalue=1, offvalue=0).pack(pady=5)
+        self.press = BooleanVar()
+        ttk.Checkbutton(self.master, text='Зажимать', variable=self.press, onvalue=True, offvalue=False).pack(pady=5)
         ttk.Button(self.master, text='Добавить', command=self.add).pack(pady=5)
 
     def add(self):
         tr = self.convert(self.trigger.get())
-        d = {}
-        if tr == 'hp_lt' or tr == 'mp_lt' or tr == 'hp_party_lt' or tr == 'mp_party_lt':
-            d = {'percent': self.percent.get(), 'btn': 'F' + str(self.btn.get()), 'use_time': self.use_time.get(),
-                 'cooldown': self.cooldown.get(), 'cyclic': self.cyclic.get()}
-        elif tr == 'buff' or tr == 'mob_dead' or tr == 'no_target' or tr == 'target_change':
-            d = {'btn': 'F' + str(self.btn.get()), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get()}
-        elif tr == 'target_hp' or tr == 'target_hp_lt':
-            d = {'btn': 'F' + str(self.btn.get()), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get(),
-                 'percent': self.percent.get(), 'cyclic': self.cyclic.get()}
+        d = {'btn': 'F' + str(self.btn.get()), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get(),
+             'percent': self.percent.get(), 'press': self.press.get()}
+
         self.root.window_info[self.index]['triggers'][tr].append(d)
         self.root.window_info.save()
         self.root.update_listbox(self.index)

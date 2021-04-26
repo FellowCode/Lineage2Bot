@@ -13,6 +13,7 @@ from windows_settings import WindowInfo
 import win32com.client
 import uuid
 import copy
+import math
 
 shell = win32com.client.Dispatch("WScript.Shell")
 
@@ -75,13 +76,12 @@ class SerialSender(Thread):
     def run(self):
         while self.work:
             if self.msg:
-                print(self.msg)
                 self.serial.write(self.msg)
                 self.msg = None
             sleep(0.01)
 
     def send(self, msg):
-        self.msg = str(str(msg[1:]) + '\n').encode()
+        self.msg = str(str(msg) + ';').encode()
 
     def connect(self):
         self.serial = serial.Serial(self.com, 115200, timeout=0)
@@ -93,27 +93,26 @@ class SerialSender(Thread):
 
 
 class LineageWindow:
-    from threading import Timer
 
     def __init__(self, window_settings, app, window_i=0):
+        self.cur_target = -1
         self.window_settings = window_settings
         self.window_i = window_i
         self.app = app
+        print(self.window_settings['name'])
         self.hwnd = get_windows_hwnd(self.window_settings['name'])[0]
         self.using_skill = False
         self.target_change = False
         self.cyclic_uid = ''
 
-    def click_btn(self, btn_code, cyclic=False):
-        print('click_btn', self.window_i, btn_code)
-        # self.set_fg_window()
+    def click_btn(self, btn_code, press=False):
+        self.set_fg_window()
         self.cyclic_uid = uuid.uuid4().hex
-
-        if False:
-            Thread(target=self.cyclic_click, args=(btn_code, copy.copy(self.cyclic_uid)), daemon=True).start()
-        else:
-            self.app.serial_sender.send(btn_code)
-        sleep(0.1)
+        if press:
+            btn_code += " press"
+        print('click_btn', self.window_i, btn_code)
+        self.app.serial_sender.send(btn_code)
+        sleep(0.01)
 
     def cyclic_click(self, btn_code, uid):
         while uid == self.cyclic_uid:
@@ -123,7 +122,7 @@ class LineageWindow:
     def set_fg_window(self):
         shell.SendKeys('%')
         win32gui.SetForegroundWindow(self.hwnd)
-        sleep(0.1)
+        sleep(0.02)
 
     def update_window_settings(self, windows_settings):
         self.window_settings = windows_settings[self.window_i]
@@ -138,23 +137,27 @@ class LineageWindow:
             triggers = self.window_settings['triggers'][trigger_name]
             for trigger in triggers:
                 if trigger_name == 'hp_lt' and trigger['percent'] > hp and trigger.get('ready', True) and not self.using_skill:
-                    self.click_btn(trigger['btn'])
+                    self.click_btn(trigger['btn'], press=trigger.get('press'))
                     self.use_cooldown_skill(trigger)
                     print('trigger', 'hp_lt')
                 if trigger_name == 'mp_lt' and trigger['percent'] > mp and trigger.get('ready', True) and not self.using_skill:
-                    self.click_btn(trigger['btn'])
+                    self.click_btn(trigger['btn'], press=trigger.get('press'))
                     self.use_cooldown_skill(trigger)
                     print('trigger', 'mp_lt')
                 if trigger_name == 'hp_party_lt' and trigger['percent'] > min(party_hps) and trigger.get('ready', True) and not self.using_skill:
                     p_index = self.get_party_index(party_hps)
-                    self.click_btn(p_index)
-                    self.click_btn(trigger['btn'])
+                    if self.cur_target != p_index+1:
+                        self.click_btn(p_index+1)
+                        self.cur_target = p_index+1
+                    self.click_btn(trigger['btn'], press=trigger.get('press'))
                     self.use_cooldown_skill(trigger)
                     print('trigger', 'hp_party_lt')
                 if trigger_name == 'mp_party_lt' and trigger['percent'] > min(party_mps) and trigger.get('ready', True) and not self.using_skill:
                     p_index = self.get_party_index(party_mps)
-                    self.click_btn(14+p_index)
-                    self.click_btn(trigger['btn'])
+                    if self.cur_target != p_index + 1:
+                        self.click_btn(p_index + 1)
+                        self.cur_target = p_index + 1
+                    self.click_btn(trigger['btn'], press=trigger.get('press'))
                     self.use_cooldown_skill(trigger)
                     print('trigger', 'mp_party_lt')
                 if trigger_name == 'mob_dead' and target_hp == 0 and last_target_hp > 0 and trigger.get('ready', True) and not self.using_skill:
@@ -162,21 +165,21 @@ class LineageWindow:
                     self.use_cooldown_skill(trigger)
                     print('trigger', 'mob_dead')
                 if trigger_name == 'no_target' and target_hp == 0 and last_target_hp == 0 and trigger.get('ready', True) and not self.using_skill:
-                    self.click_btn(trigger['btn'])
+                    self.click_btn(trigger['btn'], press=trigger.get('press'))
                     self.use_cooldown_skill(trigger)
                     print('trigger', 'no_target')
                 if trigger_name == 'target_hp' and target_hp > trigger['percent'] and trigger.get('ready', True) and not self.using_skill:
-                    self.click_btn(trigger['btn'], cyclic=trigger.get('cyclic', False))
+                    self.click_btn(trigger['btn'], press=trigger.get('press'))
                     self.use_cooldown_skill(trigger)
                     self.target_change = False
                     print('trigger', 'target_hp')
                 if trigger_name == 'target_hp_lt' and target_hp < trigger['percent'] and trigger.get('ready', True) and not self.using_skill:
-                    self.click_btn(trigger['btn'], cyclic=trigger.get('cyclic', False))
-                    self.use_cooldown_skill(trigger, )
+                    self.click_btn(trigger['btn'], press=trigger.get('press'))
+                    self.use_cooldown_skill(trigger)
                     self.target_change = False
                     print('trigger', 'target_hp')
                 if trigger_name == 'buff' and trigger.get('ready', True) and not self.using_skill:
-                    self.click_btn(trigger['btn'])
+                    self.click_btn(trigger['btn'], press=trigger.get('press'))
                     self.use_cooldown_skill(trigger)
                     print('trigger', 'buff')
 
@@ -245,7 +248,7 @@ class MainLineageWindow(LineageWindow):
 
     def update_screen(self):
         self.update_window_info()
-        # self.set_fg_window()
+        self.set_fg_window()
         self.screen = get_screen().crop(self.box)
 
     def save_screen(self):
@@ -304,22 +307,23 @@ class MainLineageWindow(LineageWindow):
         self.mp_line = self.get_value_line(hp_start_pos, 100, GraciaColors.mp)
 
         if hasattr(self, 'target_pos'):
-            target_start_pos = (self.target_pos[0] + 40, self.target_pos[1])
-            self.target_hp_line = self.get_value_line(target_start_pos, 100, GraciaColors.target_hp)
+            target_start_pos = (self.target_pos[0] + 41, self.target_pos[1])
+            self.target_hp_line = self.get_value_line(target_start_pos, 100, GraciaColors.hp)
 
-        # if hasattr(self, 'party_pos'):
-        #     party_start_pos = (self.party_pos[0] + 40, self.party_pos[1])
-        #     self.party_hp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.target_hp)]
-        #     self.party_mp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.mp)]
-        #     while True:
-        #         party_start_pos = (party_start_pos[0], self.party_hp_lines[-1][1] + 20)
-        #         self.party_hp_lines.append(self.get_value_line(party_start_pos, 100, GraciaColors.target_hp))
-        #         self.party_mp_lines.append(self.get_value_line(party_start_pos, 100, GraciaColors.mp))
-        #         if not self.party_hp_lines[-1] or not self.party_mp_lines[-1]:
-        #             del self.party_hp_lines[-1]
-        #             del self.party_mp_lines[-1]
-        #             break
-        #     print(self.party_mp_lines)
+        if hasattr(self, 'party_pos'):
+            party_start_pos = (self.party_pos[0] + 40, self.party_pos[1])
+            self.party_hp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.target_hp)]
+            self.party_mp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.mp)]
+            while True:
+                print(self.party_hp_lines[-1])
+                party_start_pos = (party_start_pos[0], self.party_hp_lines[-1][1] + 20)
+                self.party_hp_lines.append(self.get_value_line(party_start_pos, 100, GraciaColors.target_hp))
+                self.party_mp_lines.append(self.get_value_line(party_start_pos, 100, GraciaColors.mp))
+                if not self.party_hp_lines[-1] or not self.party_mp_lines[-1]:
+                    del self.party_hp_lines[-1]
+                    del self.party_mp_lines[-1]
+                    break
+            print(self.party_mp_lines)
 
         print('calibration time:', time.time() - start_time)
 
@@ -376,9 +380,9 @@ class MainLineageWindow(LineageWindow):
                     current_right = left + i
                     counter = 0
                     if digits_on_line:
-                        step = 2
+                        step = 20
                     else:
-                        step = 10
+                        step = 20
                 else:
                     if not digits_on_line and counter == 0:
                         i -= 10
@@ -387,7 +391,7 @@ class MainLineageWindow(LineageWindow):
                 if (not digits_on_line and counter > 5) or (digits_on_line and counter > 20) or left + i >= line[2]:
                     break
                 i += step
-            return int((current_right - left) / width * 100)
+            return math.ceil((current_right - left) / width * 100)
         else:
             return 0
 
