@@ -23,6 +23,7 @@ class L2BotApp:
 
     def __init__(self, master):
         self.serial_sender = None
+        self.l2_window = None
         self.master = master
         self.frame = tk.Frame(self.master)
 
@@ -30,7 +31,7 @@ class L2BotApp:
 
     def show_main_window(self):
         self.frame.title = 'Bot'
-        self.master.geometry('200x170')
+        self.master.geometry('200x190')
         self.master.resizable(False, False)
 
         # window_name_btn = Button(self.frame, text='Подключить окна', height=1)
@@ -40,6 +41,8 @@ class L2BotApp:
         ttk.Button(self.frame, text='Настройки окон', command=self.window_setup_l2_supports).pack(fill=X)
 
         ttk.Button(self.frame, text='Автокалибровка', command=lambda: self.calibration_window_init('auto')).pack(fill=X)
+        ttk.Button(self.frame, text='Пров. калибровку', command=lambda: self.calibration_window_init('check')).pack(
+            fill=X)
 
         # set_hp_button = Button(self.frame, text='Указать ХП', height=1)
         # set_hp_button.place(relx=0.05, y=115, relwidth=0.9)
@@ -75,6 +78,7 @@ class L2BotApp:
         self.frame.place(x=0, y=0, relwidth=1, relheight=1)
 
     def change_cycle_update(self):
+        self.setup_l2_window()
         self.cycle_update = not self.cycle_update
         if self.cycle_update:
             self.updater_button['text'] = 'Выключить'
@@ -107,7 +111,8 @@ class L2BotApp:
         self.app = CalibrationWindow(self, method)
 
     def setup_l2_window(self):
-        self.l2_window = MainLineageWindow(self)
+        if not self.l2_window:
+            self.l2_window = MainLineageWindow(self)
 
     def window_setup_l2_supports(self):
         self.supports_window = Toplevel(self.master)
@@ -154,10 +159,11 @@ class SetupWindowsSettings:
             ttk.Button(frame, text='Удалить триггер', command=lambda a=i: self.delete_trigger(a)).pack(side=LEFT,
                                                                                                        padx=3)
             frame = ttk.Frame(tab)
-            ttk.Label(frame, text='Название', width=40).grid(row=0, column=0)
-            ttk.Label(frame, text='Процент', width=12).grid(row=0, column=1)
-            ttk.Label(frame, text='Время использования', width=24).grid(row=0, column=2)
-            ttk.Label(frame, text='Откат', width=10).grid(row=0, column=3)
+            ttk.Label(frame, text='Название', width=36).grid(row=0, column=0)
+            ttk.Label(frame, text='Процент от', width=16).grid(row=0, column=1)
+            ttk.Label(frame, text='до', width=8).grid(row=0, column=2)
+            ttk.Label(frame, text='Время исп.', width=14).grid(row=0, column=3)
+            ttk.Label(frame, text='Откат', width=10).grid(row=0, column=4)
             ttk.Label(frame, text='Кнопка', width=8).grid(row=0, column=5)
             frame.pack(fill=X)
             self.listboxes.append(Listbox(tab, font=font))
@@ -190,9 +196,12 @@ class SetupWindowsSettings:
 
         for trigger_name in WindowInfo.ordering:
             for trigger in self.window_info[window_i]['triggers'][trigger_name]:
-                percent = str(trigger.get('percent', ''))
-                if percent != '':
-                    percent += '%'
+                pl = str(trigger.get('percent_low', ''))
+                if pl != '':
+                    pl += '%'
+                ph = str(trigger.get('percent_high', ''))
+                if pl != '':
+                    ph += '%'
                 use_time = str(trigger.get('use_time', ''))
                 if use_time != '':
                     use_time += 'c'
@@ -201,12 +210,12 @@ class SetupWindowsSettings:
                     cooldown += 'c'
                 btn = trigger.get('btn', '')
 
-                lb.insert(END, self.lb_formatter(TriggerWindow.convert(trigger_name, reverse=True), percent, use_time,
+                lb.insert(END, self.lb_formatter(TriggerWindow.convert(trigger_name, reverse=True), pl, ph, use_time,
                                                  cooldown, btn))
 
     def lb_formatter(self, *args):
 
-        col_lengths = [32, 13, 14, 8]
+        col_lengths = [32, 7, 10, 10, 8]
         s = ''
         for i, arg in enumerate(args):
             s += str(arg)
@@ -216,16 +225,14 @@ class SetupWindowsSettings:
 
 
 class TriggerWindow:
-    TRIGGERS = {'Мое ХП меньше ...%': 'hp_lt',
-                'Мое МП меньше ...%': 'mp_lt',
-                'ХП партийца меньше ...%': 'hp_party_lt',
-                'МП партийца меньше ...%': 'mp_party_lt',
+    TRIGGERS = {'Мое ХП': 'hp',
+                'Мое МП': 'mp',
+                'Сопартиец мертв': 'party_dead',
+                'ХП партийца': 'hp_party',
+                'МП партийца': 'mp_party',
                 'Бафф': 'buff',
-                'Нет цели': 'no_target',
                 'Моб убит': 'mob_dead',
-                'ХП цели больше ...%': 'target_hp',
-                'ХП цели меньше ...%': 'target_hp_lt',
-                'Цель изменена': 'target_change'}
+                'ХП цели': 'target_hp'}
 
     def __init__(self, root, index):
         self.root = root
@@ -241,8 +248,13 @@ class TriggerWindow:
         trigger_list.pack()
 
         frame = ttk.Frame(self.master)
-        self.percent = IntVar()
-        ttk.Entry(frame, width=5, textvariable=self.percent).pack(side=LEFT)
+        self.percent_low = IntVar()
+        self.percent_high = IntVar()
+        ttk.Label(frame, text='от').pack(side=LEFT, padx=(0, 2))
+        ttk.Entry(frame, width=5, textvariable=self.percent_low).pack(side=LEFT)
+        ttk.Label(frame, text='%').pack(side=LEFT)
+        ttk.Label(frame, text='до').pack(side=LEFT, padx=(10, 2))
+        ttk.Entry(frame, width=5, textvariable=self.percent_high).pack(side=LEFT)
         ttk.Label(frame, text='%').pack(side=LEFT)
         frame.pack(pady=10)
         frame = ttk.Frame(self.master)
@@ -260,14 +272,21 @@ class TriggerWindow:
         self.cooldown = IntVar()
         ttk.Entry(frame, width=5, textvariable=self.cooldown).pack(side=LEFT, padx=10)
         frame.pack(pady=5)
+        frame = ttk.Frame(self.master)
         self.press = BooleanVar()
-        ttk.Checkbutton(self.master, text='Зажимать', variable=self.press, onvalue=True, offvalue=False).pack(pady=5)
+        self.to_self = BooleanVar()
+        ttk.Checkbutton(frame, text='Использовать на себя', variable=self.to_self, onvalue=True, offvalue=False).pack(
+            side=LEFT, padx=10)
+        ttk.Checkbutton(frame, text='Зажимать', variable=self.press, onvalue=True, offvalue=False).pack(side=LEFT,
+                                                                                                        padx=10)
+        frame.pack(pady=5)
         ttk.Button(self.master, text='Добавить', command=self.add).pack(pady=5)
 
     def add(self):
         tr = self.convert(self.trigger.get())
         d = {'btn': 'F' + str(self.btn.get()), 'use_time': self.use_time.get(), 'cooldown': self.cooldown.get(),
-             'percent': self.percent.get(), 'press': self.press.get()}
+             'percent_low': self.percent_low.get(), 'percent_high': self.percent_high.get(),
+             'to_self': self.to_self.get(), 'press': self.press.get()}
 
         self.root.window_info[self.index]['triggers'][tr].append(d)
         self.root.window_info.save()
@@ -300,9 +319,12 @@ class CalibrationWindow:
         self.method = method
 
         if method == 'auto':
-            self.auto_calibration()
+            self.l2_window.calibration()
+            self.show_calibration()
         elif method == 'manual_hp' or method == 'manual_mp' or method == 'manual_target_hp':
             self.draw_line()
+        elif method == 'check':
+            self.show_calibration()
 
     def set_background(self):
         image = ImageTk.PhotoImage(self.l2_window.screen)
@@ -315,7 +337,7 @@ class CalibrationWindow:
         self.canvas.create_image(0, 0, image=image, anchor=tk.NW)
         self.canvas.pack()
 
-    def auto_calibration(self):
+    def show_calibration(self):
         def show_end_buttons():
             if hasattr(self, 'btn_ok'):
                 self.btn_ok.destroy()
@@ -343,7 +365,6 @@ class CalibrationWindow:
             self.btn_cancel.place(relx=0.5, x=2, rely=0.5)
             self.btn_cancel.bind('<ButtonRelease-1>', cancel)
 
-        self.l2_window.calibration()
         self.draw_lines()
         self.master.focus_force()
         show_end_buttons()

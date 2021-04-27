@@ -107,6 +107,8 @@ void click_key(String s, bool pressKey){
       click('-', pressKey);
     } else if (s == "="){
       click('=', pressKey);
+    } else if (s == "ESC"){
+      click(KEY_ESC, pressKey);
     }
 }
 
