@@ -1,11 +1,15 @@
 #include <Keyboard.h>
+#include <MouseTo.h>
+#include <Mouse.h>
 
 String input = "";
-bool pressed = false;
+char pressed = '!';
 
 void setup() {
   // put your setup code here, to run once:
+  delay(2000);
   Serial.begin(115200);
+  Mouse.begin();
 }
 
 void processInput(){
@@ -14,7 +18,21 @@ void processInput(){
     if (c != ';'){
       input += c;
     } else {
-      if (input.indexOf("press") >= 0){
+      if (input.indexOf("mouse") >= 0){
+        if (input.indexOf("click") >= 0){
+          String btn = getValue(input, ' ', 2);
+          if (btn == "left")
+            Mouse.click(MOUSE_LEFT);
+          else if (btn == "right")
+            Mouse.click(MOUSE_RIGHT);
+          else if (btn == "middle")
+            Mouse.click(MOUSE_MIDDLE);            
+        } else if (input.indexOf("move") >= 0) {
+          String x = getValue(input, ' ', 2);
+          String y = getValue(input, ' ', 3);
+          mouse_move(x.toInt(), y.toInt());
+        }
+      } else if (input.indexOf("press") >= 0){
         String key = getValue(input, ' ', 0);
         click_key(key, true);
       } else {
@@ -22,6 +40,25 @@ void processInput(){
       }
       input = "";
     }
+  }
+}
+
+int sign(int val){
+  if (val < 0)
+    return -1;
+  return 1;
+}
+
+void mouse_move(int x, int y){
+  int moved_x = 0, moved_y = 0;
+  while (moved_x != x or moved_y != y){
+    int move_x = x-moved_x;
+    move_x = min(64, abs(move_x))*sign(move_x);
+    int move_y = y-moved_y;
+    move_y = min(64, abs(move_y))*sign(move_y);
+    Mouse.move(move_x, move_y);
+    moved_x += move_x;
+    moved_y += move_y;
   }
 }
 
@@ -42,15 +79,14 @@ String getValue(String data, char separator, int index)
 }
 
 void click(char key, bool pressKey){
-  if (pressed)
+  if (!pressKey || pressed != key)
     release(key);
   Keyboard.press(key);
   delay(10);
   if (!pressKey){
-    Keyboard.release(key);
-    delay(10);
+    release(key);
   } else {
-    pressed = true;
+    pressed = key;
   }
 }
 

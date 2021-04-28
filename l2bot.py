@@ -1,3 +1,5 @@
+import win32api
+
 from functions import get_screen, find_template, get_screen_cv, load_img_cv, img_to_cv, invert_top_pos, color_equal, \
     get_windows_hwnd
 from time import sleep
@@ -69,19 +71,17 @@ class SerialSender(Thread):
         self.work = True
         self.serial = None
         self.com = com
-        self.msg = None
+        self.msg = []
         self.connect()
         self.daemon = True
 
     def run(self):
         while self.work:
-            if self.msg:
-                self.serial.write(self.msg)
-                self.msg = None
-            sleep(0.01)
+            if len(self.msg) > 0:
+                self.serial.write(self.msg.pop(0))
 
     def send(self, msg):
-        self.msg = str(str(msg) + ';').encode()
+        self.msg.append(str(str(msg) + ';').encode())
 
     def connect(self):
         self.serial = serial.Serial(self.com, 115200, timeout=0)
@@ -107,17 +107,26 @@ class LineageWindow:
 
     def click_btn(self, btn_code, press=False):
         self.set_fg_window()
-        self.cyclic_uid = uuid.uuid4().hex
         if press:
             btn_code += " press"
         print('click_btn', self.window_i, btn_code)
         self.app.serial_sender.send(btn_code)
         sleep(0.01)
 
-    def cyclic_click(self, btn_code, uid):
-        while uid == self.cyclic_uid:
-            self.app.serial_sender.send(btn_code)
-            sleep(.05)
+    def mouse_move_to(self, target_x, target_y):
+        while True:
+            cursor_x, cursor_y = win32api.GetCursorPos()
+            x = (target_x - cursor_x)//2
+            y = (target_y - cursor_y)//2
+            self.app.serial_sender.send(f'mouse move {int(x)} {int(y)}')
+            sleep(0.01)
+            c_x, c_y = win32api.GetCursorPos()
+            if abs(target_x-c_x) < 7 and abs(target_y-c_y) < 7:
+                break
+
+    def mouse_click(self):
+        self.set_fg_window()
+        self.app.serial_sender.send('mouse click left')
 
     def set_fg_window(self):
         shell.SendKeys('%')
@@ -136,6 +145,15 @@ class LineageWindow:
             party_mps.insert(0, mp)
             hp = party_hps.pop(self.window_i)
             mp = party_mps.pop(self.window_i)
+
+        if hp == 0:
+            self.update_window_info()
+            btn_pos_x = self.pos[0] + self.size[0] // 2 - 44
+            btn_pos_y = self.pos[1] + self.size[1] // 2 + 47
+            self.mouse_move_to(btn_pos_x, btn_pos_y)
+            self.mouse_click()
+            sleep(.1)
+            return
 
         party_hp = 100
         party_hp_i = 0
@@ -216,6 +234,53 @@ class LineageWindow:
             except:
                 pass
 
+    @staticmethod
+    def get_template_pos(template_pos, screen_cv, path):
+        try:
+
+            pos = find_template(screen_cv, load_img_cv(path), 0)
+            i = 0
+            while not pos and i < 1:
+                i += 1
+                pos = find_template(screen_cv, load_img_cv(path), i)
+            template_pos[0] = pos[0]
+            template_pos[1] = pos[1]
+            print(pos)
+        except:
+            template_pos[0] = -1
+            template_pos[1] = -1
+
+    def update_window_info(self):
+        rect = win32gui.GetWindowRect(self.hwnd)
+        x = rect[0] + 8
+        y = rect[1] + 32
+        w = rect[2] - x - 8
+        h = rect[3] - y - 8
+        self.pos = (x, y)
+        self.size = (w, h)
+        self.box = (self.pos[0], self.pos[1], self.pos[0] + self.size[0], self.pos[1] + self.size[1])
+
+    def update_screen(self):
+        self.update_window_info()
+        self.set_fg_window()
+        self.screen = get_screen().crop(self.box)
+
+    def find_res_btn(self):
+        self.update_screen()
+
+        left = (self.pos[0] + self.size[0]) // 2 - 200
+        top = (self.pos[1] + self.size[1]) // 2 - 100
+        right = (self.pos[0] + self.size[0]) // 2 + 200
+        bottom = (self.pos[1] + self.size[1]) // 2 + 100
+
+        self.screen = self.screen.crop((left, top, right, bottom))
+        screen_cv = img_to_cv(self.screen)
+
+        self.res_btn_pos = Array('i', range(2))
+        self.find_res_process = Process(target=self.get_template_pos,
+                                        args=(self.res_btn_pos, screen_cv, 'templates\\hp.jpg'))
+        self.find_res_process.start()
+
 
 class MainLineageWindow(LineageWindow):
     stat_pos = (0, 0)
@@ -237,49 +302,17 @@ class MainLineageWindow(LineageWindow):
         self.update_window_info()
         self.thp_100_count = 0
 
-
-    def update_window_info(self):
-        rect = win32gui.GetWindowRect(self.hwnd)
-        x = rect[0] + 8
-        y = rect[1] + 32
-        w = rect[2] - x - 8
-        h = rect[3] - y - 8
-        self.pos = (x, y)
-        self.size = (w, h)
-        self.box = (self.pos[0], self.pos[1], self.pos[0] + self.size[0], self.pos[1] + self.size[1])
-
     def update_windows_settings(self):
         self.windows_settings = WindowInfo()
         self.window_settings = self.windows_settings[0]
         for sup_wind in self.support_windows:
             sup_wind.update_window_settings(self.windows_settings)
 
-    def update_screen(self):
-        self.update_window_info()
-        self.set_fg_window()
-        self.screen = get_screen().crop(self.box)
-
     def save_screen(self):
         self.update_screen()
         if not os.path.exists('tmp'):
             os.makedirs('tmp')
-        self.screen.save('tmp\\l2.jpg', 'JPEG', quality=100)
-
-    @staticmethod
-    def get_template_pos(template_pos, screen_cv, path):
-        try:
-
-            pos = find_template(screen_cv, load_img_cv(path), 0)
-            i = 0
-            while not pos and i < 1:
-                i += 1
-                pos = find_template(screen_cv, load_img_cv(path), i)
-            template_pos[0] = pos[0]
-            template_pos[1] = pos[1]
-            print(pos)
-        except:
-            template_pos[0] = -1
-            template_pos[1] = -1
+        self.screen.save(f"tmp\\{self.window_settings['name']}.jpg", 'JPEG', quality=100)
 
     def calibration(self):
         self.save_screen()
@@ -348,9 +381,9 @@ class MainLineageWindow(LineageWindow):
                 self.party_hp_lines = d['party_hps']
                 self.party_mp_lines = d['party_mps']
         except:
-            self.hp_line = [0,0,0,0]
-            self.mp_line = [0,0,0,0]
-            self.target_hp = [0,0,0,0]
+            self.hp_line = [0, 0, 0, 0]
+            self.mp_line = [0, 0, 0, 0]
+            self.target_hp = [0, 0, 0, 0]
             self.party_hp_lines = []
             self.party_mp_lines = []
             print('cant load calibration')
@@ -426,7 +459,7 @@ class MainLineageWindow(LineageWindow):
         if color_equal(rgb_screen.getpixel((left, top)), color):
             if not digits_on_line:
                 # binary search
-                tmp_width = width//2
+                tmp_width = width // 2
                 center = tmp_width + left
                 pixel = rgb_screen.getpixel((center, top))
                 for i in range(5):
@@ -437,7 +470,7 @@ class MainLineageWindow(LineageWindow):
                         center -= tmp_width
                     pixel = rgb_screen.getpixel((center, top))
                 if color_equal(pixel, color):
-                    return math.ceil((center-left)/width*100)
+                    return math.ceil((center - left) / width * 100)
                 else:
                     return 0
             else:

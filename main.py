@@ -84,7 +84,7 @@ class L2BotApp:
             self.updater_button['text'] = 'Выключить'
             self.monitor = ValuesMonitor(self)
             self.monitor.start()
-            self.serial_sender = SerialSender('COM5')
+            self.serial_sender = SerialSender('COM6')
             self.serial_sender.start()
             self.l2_window.update_windows_settings()
         else:
