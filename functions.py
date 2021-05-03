@@ -5,6 +5,7 @@ from numpy import *
 import win32gui
 import pyscreenshot
 import PIL
+import pyautogui
 
 
 window_substring = 'Lineage II'
@@ -17,8 +18,12 @@ def load_img_cv(path, thumbnail=1):
     img.thumbnail((img.size[0]//thumbnail, img.size[1]//thumbnail))
     return img_to_cv(img)
 
-def get_screen():
-    return getScreenAsImage()
+def get_screen(box=None):
+    if box:
+        return pyautogui.screenshot(region=box)
+    else:
+        return pyautogui.screenshot()
+    # return getScreenAsImage()
 
 def img_to_cv(img):
     return array(img.getdata(), dtype=uint8).reshape((img.size[1], img.size[0], 3))

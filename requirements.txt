@@ -9,3 +9,4 @@ numpy
 opencv-python
 pyserial
 pyscreenshot
+pyautogui

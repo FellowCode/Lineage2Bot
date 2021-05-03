@@ -20,21 +20,40 @@ import math
 shell = win32com.client.Dispatch("WScript.Shell")
 
 
-class ValuesMonitor(Thread):
-    work = True
+class ValuesMonitor:
+    work = False
+    pause = False
 
     def __init__(self, app):
         super().__init__()
         self.app = app
-        self.pause = False
 
-    def run(self):
+    def values_updater(self):
         while self.work:
             if not self.pause:
-                self.app.l2_window.update()
+                self.app.l2_window.update_values()
                 self.app.update_values()
+                sleep(.02)
             else:
-                sleep(0.01)
+                sleep(.1)
+
+    def trigger_executer(self):
+        while self.work:
+            if not self.pause:
+                l2win = self.app.l2_window
+                l2win.triggers_exec(l2win.hp, l2win.mp, l2win.target_hp, l2win.party_hps, l2win.party_mps)
+                for sup_win in self.app.l2_window.support_windows:
+                    sup_win.triggers_exec(l2win.hp, l2win.mp, l2win.target_hp, l2win.party_hps, l2win.party_mps)
+                sleep(.02)
+            else:
+                sleep(.1)
+
+
+    def start(self):
+        self.work = True
+        self.pause = False
+        Thread(target=self.values_updater, daemon=True).start()
+        Thread(target=self.trigger_executer, daemon=True).start()
 
     def stop(self):
         self.work = False
@@ -104,6 +123,7 @@ class LineageWindow:
         self.using_skill = False
         self.target_change = False
         self.cyclic_uid = ''
+
 
     def click_btn(self, btn_code, press=False):
         self.set_fg_window()
@@ -262,8 +282,8 @@ class LineageWindow:
 
     def update_screen(self):
         self.update_window_info()
-        self.set_fg_window()
-        self.screen = get_screen().crop(self.box)
+        # self.set_fg_window()
+        self.screen = get_screen(self.box)
 
     def find_res_btn(self):
         self.update_screen()
@@ -337,31 +357,42 @@ class MainLineageWindow(LineageWindow):
 
         if stat_pos[0] != -1:
             self.stat_pos = [stat_pos[0], stat_pos[1]]
+        else:
+            self.stat_pos = None
+            self.hp_line = None
+            self.mp_line = None
 
         if target_pos[0] != -1:
             self.target_pos = [target_pos[0], target_pos[1]]
+        else:
+            self.target_pos = None
+            self.target_hp_line = None
 
         if party_pos[0] != -1:
             self.party_pos = [party_pos[0], party_pos[1]]
+        else:
+            self.party_pos = None
+            self.party_hp_lines = []
+            self.party_mp_lines = []
 
         hp_start_pos = (self.stat_pos[0] + 50, self.stat_pos[1])
 
-        self.hp_line = self.get_value_line(hp_start_pos, 100, GraciaColors.hp)
+        self.hp_line = self.get_value_line(hp_start_pos, 100, GraciaColors.hp + GraciaColors.hp_dark)
         self.mp_line = self.get_value_line(hp_start_pos, 100, GraciaColors.mp)
 
-        if hasattr(self, 'target_pos'):
+        if self.target_pos:
             target_start_pos = (self.target_pos[0] + 41, self.target_pos[1])
-            self.target_hp_line = self.get_value_line(target_start_pos, 100, GraciaColors.hp)
+            self.target_hp_line = self.get_value_line(target_start_pos, 100, GraciaColors.hp + GraciaColors.hp_dark)
 
-        if hasattr(self, 'party_pos'):
-            party_start_pos = (self.party_pos[0] + 40, self.party_pos[1])
-            self.party_hp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.target_hp)]
-            self.party_mp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.mp)]
+        if self.party_pos:
+            party_start_pos = (self.party_pos[0] + 43, self.party_pos[1])
+            self.party_hp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.party_hp + GraciaColors.party_hp_dark)]
+            self.party_mp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.party_mp + GraciaColors.party_mp_dark)]
             while True:
                 print(self.party_hp_lines[-1])
                 party_start_pos = (party_start_pos[0], self.party_hp_lines[-1][1] + 20)
-                self.party_hp_lines.append(self.get_value_line(party_start_pos, 100, GraciaColors.target_hp))
-                self.party_mp_lines.append(self.get_value_line(party_start_pos, 100, GraciaColors.mp))
+                self.party_hp_lines.append(self.get_value_line(party_start_pos, 150, GraciaColors.party_hp + GraciaColors.party_hp_dark))
+                self.party_mp_lines.append(self.get_value_line(party_start_pos, 150, GraciaColors.party_mp + GraciaColors.party_mp_dark))
                 if not self.party_hp_lines[-1] or not self.party_mp_lines[-1]:
                     del self.party_hp_lines[-1]
                     del self.party_mp_lines[-1]
@@ -380,12 +411,16 @@ class MainLineageWindow(LineageWindow):
                 self.target_hp_line = d['target_hp']
                 self.party_hp_lines = d['party_hps']
                 self.party_mp_lines = d['party_mps']
+                self.party_hps = []
+                self.party_mps = []
         except:
             self.hp_line = [0, 0, 0, 0]
             self.mp_line = [0, 0, 0, 0]
             self.target_hp = [0, 0, 0, 0]
             self.party_hp_lines = []
             self.party_mp_lines = []
+            self.party_hps = []
+            self.party_mps = []
             print('cant load calibration')
 
     def save_calibration(self):
@@ -401,53 +436,38 @@ class MainLineageWindow(LineageWindow):
         for line in lines:
             getattr(self, variable).append(self.get_percent_value(line, colors, digits_on_line=False))
 
-    def update(self):
+    def update_values(self):
         """ Bot Loop """
         start = time.time()
-        threads = []
         self.update_screen()
+        print('screnshot time', time.time() - start)
         if hasattr(self, 'hp_line'):
-            threads.append(Thread(target=self.get_percent_thread, args=('hp', self.hp_line, GraciaColors.hp)))
+            self.get_percent_thread('hp', self.hp_line, GraciaColors.hp)
         if hasattr(self, 'mp_line'):
-            threads.append(Thread(target=self.get_percent_thread, args=('mp', self.mp_line, GraciaColors.mp)))
+            self.get_percent_thread('mp', self.mp_line, GraciaColors.mp)
         if hasattr(self, 'target_hp_line'):
-            threads.append(
-                Thread(target=self.get_percent_thread, args=('target_hp', self.target_hp_line, GraciaColors.hp)))
+            self.get_percent_thread('target_hp', self.target_hp_line, GraciaColors.hp)
+
         self.party_hps = []
-        if hasattr(self, 'party_hp_lines'):
-            threads.append(
-                Thread(target=self.get_party_percent_thread,
-                       args=('party_hps', self.party_hp_lines, GraciaColors.target_hp)))
+        self.get_party_percent_thread('party_hps', self.party_hp_lines, GraciaColors.party_hp)
         self.party_mps = []
-        if hasattr(self, 'party_mp_lines'):
-            threads.append(
-                Thread(target=self.get_party_percent_thread, args=('party_mps', self.party_mp_lines, GraciaColors.mp)))
+        self.get_party_percent_thread('party_mps', self.party_mp_lines, GraciaColors.party_mp)
 
-        for thread in threads:
-            thread.start()
-
-        for thread in threads:
-            thread.join()
-
-        if self.target_hp == 100:
-            self.thp_100_count += 1
-        if self.thp_100_count == 5:
-            self.target_hp = 0
-            self.last_target_hp = 0
-        if self.target_hp < 100:
-            self.thp_100_count = 0
-
-        if self.target_hp == 0:
-            self.target_change = True
-
-        self.triggers_exec(self.hp, self.mp, self.target_hp, self.party_hps, self.party_mps)
-
-        for sup_win in self.support_windows:
-            sup_win.triggers_exec(self.hp, self.mp, self.target_hp, self.party_hps, self.party_mps)
+        # if self.target_hp == 100:
+        #     self.thp_100_count += 1
+        # if self.thp_100_count == 5:
+        #     self.target_hp = 0
+        #     self.last_target_hp = 0
+        # if self.target_hp < 100:
+        #     self.thp_100_count = 0
+        #
+        # if self.target_hp == 0:
+        #     self.target_change = True
 
         self.last_target_hp = self.target_hp
 
-        # print(time.time() - start)
+
+        print('update values time', time.time() - start)
 
     def get_percent_value(self, line, color, digits_on_line=True):
         left = line[0]
@@ -469,7 +489,8 @@ class MainLineageWindow(LineageWindow):
                     else:
                         center -= tmp_width
                     pixel = rgb_screen.getpixel((center, top))
-                if color_equal(pixel, color):
+                start_pixel = rgb_screen.getpixel((center, top))
+                if color_equal(pixel, color) or color_equal(start_pixel, color):
                     return math.ceil((center - left) / width * 100)
                 else:
                     return 0
@@ -494,6 +515,7 @@ class MainLineageWindow(LineageWindow):
                     i += step
                 return math.ceil((current_right - left) / width * 100)
         else:
+            print('a')
             return 0
 
     def get_value_line(self, start_pos, max_height, color):

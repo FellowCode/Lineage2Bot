@@ -11,6 +11,7 @@ from tkinter import *
 from tkinter import ttk
 from PIL import ImageTk, Image
 from windows_settings import WindowInfo
+from tkinter import filedialog
 
 import time
 
@@ -26,6 +27,7 @@ class L2BotApp:
         self.l2_window = None
         self.master = master
         self.frame = tk.Frame(self.master)
+        self.monitor = ValuesMonitor(self)
 
         self.show_main_window()
 
@@ -82,7 +84,6 @@ class L2BotApp:
         self.cycle_update = not self.cycle_update
         if self.cycle_update:
             self.updater_button['text'] = 'Выключить'
-            self.monitor = ValuesMonitor(self)
             self.monitor.start()
             self.serial_sender = SerialSender('COM6')
             self.serial_sender.start()
@@ -123,12 +124,17 @@ class SetupWindowsSettings:
     def __init__(self, root):
         self.root = root
         self.master = root.supports_window
-        self.master.geometry(f'600x340+{root.master.winfo_x()}+{root.master.winfo_y()}')
+        self.master.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.master.geometry(f'630x340+{root.master.winfo_x()}+{root.master.winfo_y()}')
         self.master.resizable(False, False)
 
         self.window_info = WindowInfo()
 
         self.ui_init()
+
+    def on_close(self):
+        self.save()
+        self.master.destroy()
 
     def ui_init(self):
         tab_parent = ttk.Notebook(self.master)
@@ -154,10 +160,11 @@ class SetupWindowsSettings:
             self.actives.append(cvar)
             ttk.Checkbutton(frame, text='Активное', variable=cvar, onvalue=1, offvalue=0).pack(side=LEFT)
             frame.pack(anchor=NW, fill=X, pady=3)
-            ttk.Button(frame, text='Сохранить', command=lambda a=i: self.save(a)).pack(side=LEFT, padx=3)
-            ttk.Button(frame, text='Добавить триггер', command=lambda a=i: self.add_trigger(a)).pack(side=LEFT, padx=3)
-            ttk.Button(frame, text='Удалить триггер', command=lambda a=i: self.delete_trigger(a)).pack(side=LEFT,
-                                                                                                       padx=3)
+            ttk.Button(frame, text='Сохр', width=5, command=lambda a=i: self.save_triggers_as(a)).pack(side=LEFT, padx=3)
+            ttk.Button(frame, text='Откр', width=5, command=lambda a=i: self.load_triggers(a)).pack(side=LEFT, padx=3)
+            ttk.Button(frame, text='Добавить', command=lambda a=i: self.add_trigger(a)).pack(side=LEFT, padx=3)
+            ttk.Button(frame, text='Изменить', command=lambda a=i: self.delete_trigger(a)).pack(side=LEFT, padx=3)
+            ttk.Button(frame, text='Удалить', command=lambda a=i: self.delete_trigger(a)).pack(side=LEFT, padx=3)
             frame = ttk.Frame(tab)
             ttk.Label(frame, text='Название', width=36).grid(row=0, column=0)
             ttk.Label(frame, text='Процент от', width=16).grid(row=0, column=1)
@@ -175,10 +182,25 @@ class SetupWindowsSettings:
         btn_frame = ttk.Frame(self.master)
         btn_frame.pack(side=BOTTOM)
 
-    def save(self, window_i):
-        self.window_info[window_i]['active'] = self.actives[window_i].get()
-        self.window_info[window_i]['name'] = self.names[window_i].get()
+    def save(self):
+        for i in range(9):
+            self.window_info[i]['active'] = self.actives[i].get()
+            self.window_info[i]['name'] = self.names[i].get()
         self.window_info.save()
+
+    def save_triggers_as(self, window_i):
+        file = filedialog.asksaveasfile(filetypes=[('L2BotTriggers', '*.l2bt')], defaultextension='.l2bt', initialdir='save/')
+        if file:
+            file.write(str(self.window_info[window_i]['triggers']))
+            file.close()
+
+    def load_triggers(self, window_i):
+        file = filedialog.askopenfile(filetypes=[('L2BotTriggers', '*.l2bt')], defaultextension='.l2bt', initialdir='save/')
+        if file:
+            self.window_info[window_i]['triggers'] = eval(file.read())
+            file.close()
+            self.update_listbox(window_i)
+
 
     def add_trigger(self, window_i):
         self.trigger_window = Toplevel(self.master)
