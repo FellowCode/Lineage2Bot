@@ -469,6 +469,8 @@ class CalibrationWindow:
         self.set_background()
         if self.l2_window.hp_line:
             self.hp_line = self.canvas.create_line(self.l2_window.hp_line, width=2, fill='white')
+        if self.l2_window.hp_offset_line:
+            self.hp_offset_line = self.canvas.create_line(self.l2_window.hp_offset_line, width=2, fill='white')
         if self.l2_window.mp_line:
             self.mp_line = self.canvas.create_line(self.l2_window.mp_line, width=2, fill='white')
         if self.l2_window.target_hp_line:

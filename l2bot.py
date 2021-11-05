@@ -1,20 +1,17 @@
 import win32api
 
-from functions import get_screen, find_template, get_screen_cv, load_img_cv, img_to_cv, invert_top_pos, color_equal, \
-    get_windows_hwnd
+import settings
+from functions import get_screen, find_template, load_img_cv, img_to_cv, color_equal, get_windows_hwnd
 from time import sleep
 import time
 from colors import GraciaColors
-from multiprocessing import Process, Value, Array
+from multiprocessing import Process, Array
 import os
 from threading import Thread, Timer
 import serial
 import win32gui
-
 from windows_settings import WindowInfo
 import win32com.client
-import uuid
-import copy
 import math
 
 shell = win32com.client.Dispatch("WScript.Shell")
@@ -47,7 +44,6 @@ class ValuesMonitor:
                 sleep(.02)
             else:
                 sleep(.1)
-
 
     def start(self):
         self.work = True
@@ -119,11 +115,10 @@ class LineageWindow:
         self.window_i = window_i
         self.app = app
         print(self.window_settings['name'])
-        self.hwnd = get_windows_hwnd(self.window_settings['name'])[0]
+        self.hwnd = get_windows_hwnd(self.window_settings['name'] + settings.WINDOW_NAME_POSTFIX)[0]
         self.using_skill = False
         self.target_change = False
         self.cyclic_uid = ''
-
 
     def click_btn(self, btn_code, press=False):
         self.set_fg_window()
@@ -282,7 +277,7 @@ class LineageWindow:
 
     def update_screen(self):
         self.update_window_info()
-        # self.set_fg_window()
+        self.set_fg_window()
         self.screen = get_screen(self.box)
 
     def find_res_btn(self):
@@ -344,11 +339,11 @@ class MainLineageWindow(LineageWindow):
         party_pos = Array('i', range(2))
         screen_cv = img_to_cv(self.screen)
         processes = []
-        processes.append(Process(target=self.get_template_pos, args=(stat_pos, screen_cv, 'templates\\hp.jpg')))
+        processes.append(Process(target=self.get_template_pos, args=(stat_pos, screen_cv, 'templates\\hp_mw.jpg')))
         processes.append(
-            Process(target=self.get_template_pos, args=(target_pos, screen_cv, 'templates\\target_scryde.jpg')))
+            Process(target=self.get_template_pos, args=(target_pos, screen_cv, 'templates\\target_mw.jpg')))
         processes.append(
-            Process(target=self.get_template_pos, args=(party_pos, screen_cv, 'templates\\party_scryde.jpg')))
+            Process(target=self.get_template_pos, args=(party_pos, screen_cv, 'templates\\party_mw.jpg')))
 
         for proc in processes:
             proc.start()
@@ -375,19 +370,20 @@ class MainLineageWindow(LineageWindow):
             self.party_hp_lines = []
             self.party_mp_lines = []
 
-        hp_start_pos = (self.stat_pos[0] + 50, self.stat_pos[1])
+        hp_start_pos = (self.stat_pos[0] + settings.HP_LEFT_OFFSET, self.stat_pos[1])
 
-        self.hp_line = self.get_value_line(hp_start_pos, 100, GraciaColors.hp + GraciaColors.hp_dark)
-        self.mp_line = self.get_value_line(hp_start_pos, 100, GraciaColors.mp)
+        self.hp_offset_line = [hp_start_pos[0] + settings.HP_LEFT_OFFSET, hp_start_pos[1], hp_start_pos[0] + settings.HP_LEFT_OFFSET, hp_start_pos[1] + settings.HP_MAX_HEIGHT]
+        self.hp_line = self.get_value_line(hp_start_pos, settings.HP_MAX_HEIGHT, settings.COLORS.hp + settings.COLORS.hp_dark)
+        self.mp_line = self.get_value_line(hp_start_pos, settings.HP_MAX_HEIGHT, settings.COLORS.mp)
 
         if self.target_pos:
-            target_start_pos = (self.target_pos[0] + 41, self.target_pos[1])
-            self.target_hp_line = self.get_value_line(target_start_pos, 100, GraciaColors.hp + GraciaColors.hp_dark)
+            target_start_pos = (self.target_pos[0] + 80, self.target_pos[1])
+            self.target_hp_line = self.get_value_line(target_start_pos, 100, settings.COLORS.hp + settings.COLORS.hp_dark)
 
         if self.party_pos:
-            party_start_pos = (self.party_pos[0] + 43, self.party_pos[1])
-            self.party_hp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.party_hp + GraciaColors.party_hp_dark)]
-            self.party_mp_lines = [self.get_value_line(party_start_pos, 100, GraciaColors.party_mp + GraciaColors.party_mp_dark)]
+            party_start_pos = (self.party_pos[0] + 80, self.party_pos[1])
+            self.party_hp_lines = [self.get_value_line(party_start_pos, 100, settings.COLORS.hp + settings.COLORS.hp_dark)]
+            self.party_mp_lines = [self.get_value_line(party_start_pos, 100, settings.COLORS.mp)]
             while True:
                 print(self.party_hp_lines[-1])
                 party_start_pos = (party_start_pos[0], self.party_hp_lines[-1][1] + 20)
