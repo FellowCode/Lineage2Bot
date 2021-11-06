@@ -17,42 +17,47 @@ import math
 shell = win32com.client.Dispatch("WScript.Shell")
 
 
-class ValuesMonitor:
+class BotWorker:
     work = False
     pause = False
+    app = None
 
-    def __init__(self, app):
-        super().__init__()
-        self.app = app
+    @classmethod
+    def init(cls, app):
+        cls.app = app
 
-    def values_updater(self):
-        while self.work:
-            if not self.pause:
-                self.app.l2_window.update_values()
-                self.app.update_values()
+    @classmethod
+    def values_updater(cls):
+        while cls.work:
+            if not cls.pause:
+                cls.app.l2_window.update_values()
+                cls.app.update_values()
                 sleep(.02)
             else:
                 sleep(.1)
 
-    def trigger_executer(self):
-        while self.work:
-            if not self.pause:
-                l2win = self.app.l2_window
+    @classmethod
+    def trigger_executer(cls):
+        while cls.work:
+            if not cls.pause:
+                l2win = cls.app.l2_window
                 l2win.triggers_exec(l2win.hp, l2win.mp, l2win.target_hp, l2win.party_hps, l2win.party_mps)
-                for sup_win in self.app.l2_window.support_windows:
+                for sup_win in cls.app.l2_window.support_windows:
                     sup_win.triggers_exec(l2win.hp, l2win.mp, l2win.target_hp, l2win.party_hps, l2win.party_mps)
                 sleep(.02)
             else:
                 sleep(.1)
 
-    def start(self):
-        self.work = True
-        self.pause = False
-        Thread(target=self.values_updater, daemon=True).start()
-        Thread(target=self.trigger_executer, daemon=True).start()
+    @classmethod
+    def start(cls):
+        cls.work = True
+        cls.pause = False
+        Thread(target=cls.values_updater, daemon=True).start()
+        Thread(target=cls.trigger_executer, daemon=True).start()
 
-    def stop(self):
-        self.work = False
+    @classmethod
+    def stop(cls):
+        cls.work = False
 
 
 class FindTemplate(Thread):
@@ -83,6 +88,7 @@ class FindTemplate(Thread):
 class SerialSender(Thread):
     def __init__(self, com):
         super().__init__()
+        self.connected = False
         self.work = True
         self.serial = None
         self.com = com
@@ -99,12 +105,17 @@ class SerialSender(Thread):
         self.msg.append(str(str(msg) + ';').encode())
 
     def connect(self):
-        self.serial = serial.Serial(self.com, 115200, timeout=0)
-        pass
+        try:
+            self.serial = serial.Serial(self.com, 115200, timeout=0)
+            self.connected = True
+        except:
+            print('Connection error')
 
     def stop(self):
+        self.connected = False
         self.work = False
-        self.serial.close()
+        if self.serial:
+            self.serial.close()
 
 
 class LineageWindow:
@@ -146,7 +157,7 @@ class LineageWindow:
     def set_fg_window(self):
         shell.SendKeys('%')
         win32gui.SetForegroundWindow(self.hwnd)
-        sleep(0.02)
+        sleep(0.01)
 
     def update_window_settings(self, windows_settings):
         self.window_settings = windows_settings[self.window_i]
@@ -155,7 +166,12 @@ class LineageWindow:
         return trigger.get('ready', True) and not self.using_skill
 
     def triggers_exec(self, hp, mp, target_hp, party_hps, party_mps):
+        if not self.app.serial_sender or not self.app.serial_sender.connected:
+            print('serial not connected')
+            return
         if self.window_i > 0:
+            if len(party_hps) != len(self.app.l2_window.support_windows) or len(party_hps) != len(party_mps):
+                return
             party_hps.insert(0, hp)
             party_mps.insert(0, mp)
             hp = party_hps.pop(self.window_i)
@@ -184,11 +200,11 @@ class LineageWindow:
             triggers = self.window_settings['triggers'][t_name]
             used = False
             for t in triggers:
-                if t_name == 'hp_lt' and t['percent_low'] <= hp <= t['percent_high'] and self.can_use(t):
+                if t_name == 'hp' and t['percent_low'] <= hp <= t['percent_high'] and self.can_use(t):
                     self.use_cooldown_skill(t)
                     print('trigger', t_name)
                     used = True
-                if t_name == 'mp_lt' and t['percent_low'] <= mp <= t['percent_high'] and self.can_use(t):
+                if t_name == 'mp' and t['percent_low'] <= mp <= t['percent_high'] and self.can_use(t):
                     self.use_cooldown_skill(t)
                     print('trigger', t_name)
                     used = True
@@ -278,7 +294,9 @@ class LineageWindow:
     def update_screen(self):
         self.update_window_info()
         self.set_fg_window()
+        start = time.time()
         self.screen = get_screen(self.box)
+        print('fullscreen time', time.time() - start)
 
     def find_res_btn(self):
         self.update_screen()
@@ -304,6 +322,15 @@ class MainLineageWindow(LineageWindow):
     hp = mp = target_hp = -1
 
     def __init__(self, app):
+        self.hp_line = None
+        self.mp_line = None
+        self.target_hp_line = None
+        self.party_hp_lines = []
+        self.party_mp_lines = []
+        self.party_hps = []
+        self.party_mps = []
+        self.hp = None
+        self.mp = None
         self.load_calibration()
         self.support_windows = []
 
@@ -325,9 +352,9 @@ class MainLineageWindow(LineageWindow):
 
     def save_screen(self):
         self.update_screen()
-        if not os.path.exists('tmp'):
-            os.makedirs('tmp')
-        self.screen.save(f"tmp\\{self.window_settings['name']}.jpg", 'JPEG', quality=100)
+        # if not os.path.exists('tmp'):
+        #     os.makedirs('tmp')
+        # self.screen.save(f"tmp\\{self.window_settings['name']}.jpg", 'JPEG', quality=100)
 
     def calibration(self):
         self.save_screen()
@@ -431,33 +458,32 @@ class MainLineageWindow(LineageWindow):
                  'party_hps': self.party_hp_lines, 'party_mps': self.party_mp_lines}
             f.write(str(d))
 
-    def get_percent_thread(self, variable, line, colors):
-        setattr(self, variable, self.get_percent_value(line, colors))
-
-    def get_party_percent_thread(self, variable, lines, colors):
-        for line in lines:
-            getattr(self, variable).append(self.get_percent_value(line, colors, digits_on_line=False))
-
     def update_values(self):
         """ Bot Loop """
-        start = time.time()
         self.update_screen()
-        print('screnshot time', time.time() - start)
+        start = time.time()
         if hasattr(self, 'hp_line'):
-            self.get_percent_thread('hp', self.hp_line, settings.COLORS.hp)
+            start_hp = time.time()
+            self.hp = self.get_percent_value(self.hp_line, settings.COLORS.hp, digits_on_line=True)
+            print('hp to percent time', time.time() - start_hp)
         if hasattr(self, 'mp_line'):
-            self.get_percent_thread('mp', self.mp_line, settings.COLORS.mp)
+            self.mp = self.get_percent_value(self.mp_line, settings.COLORS.mp, digits_on_line=True)
         if hasattr(self, 'target_hp_line'):
-            self.get_percent_thread('target_hp', self.target_hp_line, settings.COLORS.target_hp)
+            self.target_hp = self.get_percent_value(self.target_hp_line, settings.COLORS.target_hp, digits_on_line=False)
 
-        self.party_hps = []
-        self.get_party_percent_thread('party_hps', self.party_hp_lines, settings.COLORS.party_hp)
-        self.party_mps = []
-        self.get_party_percent_thread('party_mps', self.party_mp_lines, settings.COLORS.party_mp)
+        start_hp = time.time()
+        party_hps = []
+        for party_hp_line in self.party_hp_lines:
+            party_hps.append(self.get_percent_value(party_hp_line, settings.COLORS.party_hp, digits_on_line=False))
+        self.party_hps = party_hps
+        print('party hps to percent time', time.time() - start_hp)
 
+        party_mps = []
+        for party_mp_line in self.party_mp_lines:
+            party_mps.append(self.get_percent_value(party_mp_line, settings.COLORS.party_mp, digits_on_line=False))
+        self.party_mps = party_mps
 
         self.last_target_hp = self.target_hp
-
 
         print('update values time', time.time() - start)
 
@@ -468,7 +494,7 @@ class MainLineageWindow(LineageWindow):
         current_right = left
         rgb_screen = self.screen.convert('RGB')
 
-        if color_equal(rgb_screen.getpixel((left, top)), color):
+        if color_equal(rgb_screen.getpixel((left+1, top)), color):
             if not digits_on_line:
                 # binary search
                 tmp_width = width // 2
@@ -493,10 +519,7 @@ class MainLineageWindow(LineageWindow):
                     if color_equal(pixel, color):
                         current_right = left + i
                         counter = 0
-                        if digits_on_line:
-                            step = 10
-                        else:
-                            step = 10
+                        step = 10
                     else:
                         if not digits_on_line and counter == 0:
                             i -= 10
@@ -507,7 +530,6 @@ class MainLineageWindow(LineageWindow):
                     i += step
                 return math.ceil((current_right - left) / width * 100)
         else:
-            print('a')
             return 0
 
     def get_value_line(self, start_pos, max_height, color):

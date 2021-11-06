@@ -86,9 +86,10 @@ class GraciaColors:
 
 
 class MWColors:
-    hp = [(137, 32, 31),
+    hp = [#(137, 32, 31),
           (127, 62, 56),
-          (121, 28, 17)]
+          #(121, 28, 17)
+          ]
 
     hp_dark = []
 

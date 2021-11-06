@@ -3,7 +3,7 @@ from ctypes import windll
 import os
 
 from functions import get_screen, get_windows_hwnd
-from l2bot import MainLineageWindow, ValuesMonitor, LineageWindow, SerialSender
+from l2bot import MainLineageWindow, BotWorker, LineageWindow, SerialSender
 
 import tkinter as tk
 from tkinter.font import Font
@@ -23,44 +23,31 @@ class L2BotApp:
     cycle_update = False
 
     def __init__(self, master):
+        self.com = IntVar()
         self.serial_sender = None
         self.l2_window = None
         self.master = master
         self.frame = tk.Frame(self.master)
-        self.monitor = ValuesMonitor(self)
-
+        master.bind("<FocusIn>", self.handle_focus)
+        master.protocol("WM_DELETE_WINDOW", self.on_closing)
+        BotWorker.init(self)
+        self.load_settings()
         self.show_main_window()
 
     def show_main_window(self):
         self.frame.title = 'Bot'
-        self.master.geometry('200x190')
+        self.master.geometry('200x210')
         self.master.resizable(False, False)
 
-        # window_name_btn = Button(self.frame, text='Подключить окна', height=1)
-        # window_name_btn.place(relx=0.05, y=10, relwidth=0.9)
-        # window_name_btn.bind('<ButtonRelease-1>', lambda event: self.setup_l2_window())
-
+        frame = ttk.Frame(self.frame)
+        ttk.Label(frame, text='Arduino COM').pack(side=LEFT, padx=(0, 2))
+        ttk.Entry(frame, width=5, textvariable=self.com).pack(side=LEFT)
+        frame.pack(fill=X)
         ttk.Button(self.frame, text='Настройки окон', command=self.window_setup_l2_supports).pack(fill=X)
 
         ttk.Button(self.frame, text='Автокалибровка', command=lambda: self.calibration_window_init('auto')).pack(fill=X)
         ttk.Button(self.frame, text='Пров. калибровку', command=lambda: self.calibration_window_init('check')).pack(
             fill=X)
-
-        # set_hp_button = Button(self.frame, text='Указать ХП', height=1)
-        # set_hp_button.place(relx=0.05, y=115, relwidth=0.9)
-        # set_hp_button.bind('<ButtonRelease-1>', lambda event: self.calibration_window_init('manual_hp'))
-
-        # set_mp_button = Button(self.frame, text='Указать МП', height=1)
-        # set_mp_button.place(relx=0.05, y=145, relwidth=0.9)
-        # set_mp_button.bind('<ButtonRelease-1>', lambda event: self.calibration_window_init('manual_mp'))
-
-        # set_target_hp_button = Button(self.frame, text='Указать ХП цели', height=1)
-        # set_target_hp_button.place(relx=0.05, y=175, relwidth=0.9)
-        # set_target_hp_button.bind('<ButtonRelease-1>', lambda event: self.calibration_window_init('manual_target_hp'))
-
-        # screen_btn = Button(self.frame, text='Сделать скриншот', height=1)
-        # screen_btn.place(relx=0.05, y=205, relwidth=0.9)
-        # screen_btn.bind('<ButtonRelease-1>', lambda ev: self.l2_window.save_screen())
 
         self.updater_button = ttk.Button(self.frame, text='Включить', command=self.change_cycle_update)
         self.updater_button.pack(fill=X)
@@ -84,17 +71,12 @@ class L2BotApp:
         self.cycle_update = not self.cycle_update
         if self.cycle_update:
             self.updater_button['text'] = 'Выключить'
-            self.monitor.start()
-            self.serial_sender = SerialSender('COM6')
+            BotWorker.start()
+            self.serial_sender = SerialSender(f'COM{self.com.get()}')
             self.serial_sender.start()
             self.l2_window.update_windows_settings()
         else:
-            self.monitor.stop()
-            self.serial_sender.stop()
-            self.updater_button['text'] = 'Включить'
-            self.hp_label['text'] = 'HP: None'
-            self.mp_label['text'] = 'MP: None'
-            self.target_hp_label['text'] = 'T_HP: None'
+            self.disable_bot()
 
     def change_pause(self):
         self.monitor.pause = not self.monitor.pause
@@ -118,6 +100,33 @@ class L2BotApp:
     def window_setup_l2_supports(self):
         self.supports_window = Toplevel(self.master)
         self.app = SetupWindowsSettings(self)
+
+    def disable_bot(self):
+        BotWorker.stop()
+        if self.serial_sender:
+            self.serial_sender.stop()
+        time.sleep(.02)
+        self.updater_button['text'] = 'Включить'
+        self.hp_label['text'] = 'HP: None'
+        self.mp_label['text'] = 'MP: None'
+        self.target_hp_label['text'] = 'T_HP: None'
+
+    def handle_focus(self, event):
+        self.cycle_update = False
+        if not self.cycle_update:
+            self.disable_bot()
+
+    def load_settings(self):
+        if not os.path.exists('save/settings.txt'):
+            return
+        with open('save/settings.txt') as f:
+            app_settings = eval(f.read())
+            self.com.set(app_settings.get('COM', 0))
+
+    def on_closing(self):
+        with open('save/settings.txt', 'w') as f:
+            f.write(str({'COM': self.com.get()}))
+        self.master.destroy()
 
 
 class SetupWindowsSettings:
@@ -249,11 +258,9 @@ class SetupWindowsSettings:
 class TriggerWindow:
     TRIGGERS = {'Мое ХП': 'hp',
                 'Мое МП': 'mp',
-                'Сопартиец мертв': 'party_dead',
                 'ХП партийца': 'hp_party',
                 'МП партийца': 'mp_party',
                 'Бафф': 'buff',
-                'Моб убит': 'mob_dead',
                 'ХП цели': 'target_hp'}
 
     def __init__(self, root, index):
