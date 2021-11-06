@@ -2,7 +2,7 @@ import os, pickle
 
 
 class WindowInfo:
-    ordering = ['hp', 'mp', 'hp_party', 'mp_party', 'buff', 'target_hp']
+    ordering = ['hp', 'mp', 'hp_party', 'mp_party', 'target_hp', 'buff']
 
     def __init__(self):
         self.values = [{'active': 0, 'name': '',

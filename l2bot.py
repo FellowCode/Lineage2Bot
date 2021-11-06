@@ -44,7 +44,7 @@ class BotWorker:
                 l2win.triggers_exec(l2win.hp, l2win.mp, l2win.target_hp, l2win.party_hps, l2win.party_mps)
                 for sup_win in cls.app.l2_window.support_windows:
                     sup_win.triggers_exec(l2win.hp, l2win.mp, l2win.target_hp, l2win.party_hps, l2win.party_mps)
-                sleep(.02)
+                sleep(.1)
             else:
                 sleep(.1)
 
@@ -186,16 +186,21 @@ class LineageWindow:
             sleep(.1)
             return
 
-        party_hp = 100
-        party_hp_i = 0
-        party_dead_i = -1
+        party_min_hp = 100
+        party_min_hp_i = 0
         for i, php in enumerate(party_hps):
-            if 0 < php < party_hp:
-                party_hp = php
-                party_hp_i = i
-            if php == 0:
-                party_dead_i = i
+            if 0 < php < party_min_hp:
+                party_min_hp = php
+                party_min_hp_i = i
 
+        party_min_mp = 100
+        party_min_mp_i = 0
+        for i, pmp in enumerate(party_mps):
+            if 0 < pmp < party_min_hp:
+                party_min_mp = pmp
+                party_min_mp_i = i
+
+        print('triggers exec')
         for t_name in WindowInfo.ordering:
             triggers = self.window_settings['triggers'][t_name]
             used = False
@@ -208,17 +213,17 @@ class LineageWindow:
                     self.use_cooldown_skill(t)
                     print('trigger', t_name)
                     used = True
-                if t_name == 'party_dead' and party_dead_i >= 0 and self.can_use(t):
-                    if self.cur_target != party_dead_i + 2:
-                        self.click_btn(party_dead_i + 2)
-                        self.cur_target = party_dead_i + 2
+                if t_name == 'hp_party' and t['percent_low'] <= party_min_hp <= t['percent_high'] and self.can_use(t):
+                    if self.cur_target != party_min_hp_i + 2:
+                        self.click_btn(party_min_hp_i + 2)
+                        self.cur_target = party_min_hp_i + 2
                     self.use_cooldown_skill(t)
                     print('trigger', t_name)
                     used = True
-                if t_name == 'hp_party' and t['percent_low'] <= party_hp <= t['percent_high'] and self.can_use(t):
-                    if self.cur_target != party_hp_i + 2:
-                        self.click_btn(party_hp_i + 2)
-                        self.cur_target = party_hp_i + 2
+                if t_name == 'mp_party' and t['percent_low'] <= party_min_mp <= t['percent_high'] and self.can_use(t):
+                    if self.cur_target != party_min_mp_i + 2:
+                        self.click_btn(party_min_mp_i + 2)
+                        self.cur_target = party_min_mp_i + 2
                     self.use_cooldown_skill(t)
                     print('trigger', t_name)
                     used = True
@@ -250,6 +255,7 @@ class LineageWindow:
         self.click_btn(trigger['btn'], press=trigger.get('press'))
         if trigger.get('to_self') and not trigger.get('press'):
             self.click_btn('ESC')
+            self.cur_target = None
 
         def used(trigger):
             trigger['ready'] = True
@@ -322,9 +328,9 @@ class MainLineageWindow(LineageWindow):
     hp = mp = target_hp = -1
 
     def __init__(self, app):
-        self.hp_line = None
-        self.mp_line = None
-        self.target_hp_line = None
+        self.hp_line = [0, 0, 0, 0]
+        self.mp_line = [0, 0, 0, 0]
+        self.target_hp = [0, 0, 0, 0]
         self.party_hp_lines = []
         self.party_mp_lines = []
         self.party_hps = []
@@ -400,9 +406,7 @@ class MainLineageWindow(LineageWindow):
         hp_start_pos = (self.stat_pos[0] + settings.HP_LEFT_OFFSET, self.stat_pos[1])
 
         self.hp_offset_line = [hp_start_pos[0], hp_start_pos[1], hp_start_pos[0], hp_start_pos[1] + settings.HP_MAX_HEIGHT]
-        print('hp line')
         self.hp_line = self.get_value_line(hp_start_pos, settings.HP_MAX_HEIGHT, settings.COLORS.hp)
-        print('mp line')
         self.mp_line = self.get_value_line(hp_start_pos, settings.HP_MAX_HEIGHT, settings.COLORS.mp)
 
         if self.target_pos:
@@ -463,20 +467,16 @@ class MainLineageWindow(LineageWindow):
         self.update_screen()
         start = time.time()
         if hasattr(self, 'hp_line'):
-            start_hp = time.time()
             self.hp = self.get_percent_value(self.hp_line, settings.COLORS.hp, digits_on_line=True)
-            print('hp to percent time', time.time() - start_hp)
         if hasattr(self, 'mp_line'):
             self.mp = self.get_percent_value(self.mp_line, settings.COLORS.mp, digits_on_line=True)
         if hasattr(self, 'target_hp_line'):
             self.target_hp = self.get_percent_value(self.target_hp_line, settings.COLORS.target_hp, digits_on_line=False)
 
-        start_hp = time.time()
         party_hps = []
         for party_hp_line in self.party_hp_lines:
             party_hps.append(self.get_percent_value(party_hp_line, settings.COLORS.party_hp, digits_on_line=False))
         self.party_hps = party_hps
-        print('party hps to percent time', time.time() - start_hp)
 
         party_mps = []
         for party_mp_line in self.party_mp_lines:
@@ -490,11 +490,14 @@ class MainLineageWindow(LineageWindow):
     def get_percent_value(self, line, color, digits_on_line=True):
         left = line[0]
         top = line[1]
+        right = line[2]
         width = line[2] - left
         current_right = left
         rgb_screen = self.screen.convert('RGB')
 
         if color_equal(rgb_screen.getpixel((left+1, top)), color):
+            if color_equal(rgb_screen.getpixel((right-1, top)), color):
+                return 100
             if not digits_on_line:
                 # binary search
                 tmp_width = width // 2
