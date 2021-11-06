@@ -69,12 +69,7 @@ def get_window_hwnd(hwnd, windows_info):
 def color_equal(pixel, value):
     if type(value) is list:
         for val in value:
-            overlap = True
-            for i, color in enumerate(pixel):
-                if color > val[i] + 5 or color < val[i] - 5:
-                    overlap = False
-                    break
-            if overlap:
+            if val == pixel:
                 return True
         return False
     else:

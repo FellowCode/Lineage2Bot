@@ -372,26 +372,32 @@ class MainLineageWindow(LineageWindow):
 
         hp_start_pos = (self.stat_pos[0] + settings.HP_LEFT_OFFSET, self.stat_pos[1])
 
-        self.hp_offset_line = [hp_start_pos[0] + settings.HP_LEFT_OFFSET, hp_start_pos[1], hp_start_pos[0] + settings.HP_LEFT_OFFSET, hp_start_pos[1] + settings.HP_MAX_HEIGHT]
-        self.hp_line = self.get_value_line(hp_start_pos, settings.HP_MAX_HEIGHT, settings.COLORS.hp + settings.COLORS.hp_dark)
+        self.hp_offset_line = [hp_start_pos[0], hp_start_pos[1], hp_start_pos[0], hp_start_pos[1] + settings.HP_MAX_HEIGHT]
+        print('hp line')
+        self.hp_line = self.get_value_line(hp_start_pos, settings.HP_MAX_HEIGHT, settings.COLORS.hp)
+        print('mp line')
         self.mp_line = self.get_value_line(hp_start_pos, settings.HP_MAX_HEIGHT, settings.COLORS.mp)
 
         if self.target_pos:
             target_start_pos = (self.target_pos[0] + 80, self.target_pos[1])
-            self.target_hp_line = self.get_value_line(target_start_pos, 100, settings.COLORS.hp + settings.COLORS.hp_dark)
+            self.target_hp_line = self.get_value_line(target_start_pos, 100, settings.COLORS.target_hp)
 
         if self.party_pos:
+            print('party_pos', self.party_pos)
             party_start_pos = (self.party_pos[0] + 80, self.party_pos[1])
-            self.party_hp_lines = [self.get_value_line(party_start_pos, 100, settings.COLORS.hp + settings.COLORS.hp_dark)]
-            self.party_mp_lines = [self.get_value_line(party_start_pos, 100, settings.COLORS.mp)]
+            self.party_hp_lines = [self.get_value_line(party_start_pos, 100, settings.COLORS.party_hp)]
+            self.party_mp_lines = [self.get_value_line(party_start_pos, 100, settings.COLORS.party_mp)]
             while True:
                 print(self.party_hp_lines[-1])
-                party_start_pos = (party_start_pos[0], self.party_hp_lines[-1][1] + 20)
-                self.party_hp_lines.append(self.get_value_line(party_start_pos, 150, GraciaColors.party_hp + GraciaColors.party_hp_dark))
-                self.party_mp_lines.append(self.get_value_line(party_start_pos, 150, GraciaColors.party_mp + GraciaColors.party_mp_dark))
-                if not self.party_hp_lines[-1] or not self.party_mp_lines[-1]:
-                    del self.party_hp_lines[-1]
-                    del self.party_mp_lines[-1]
+                if self.party_hp_lines[-1] and party_start_pos:
+                    party_start_pos = (party_start_pos[0], self.party_hp_lines[-1][1] + 20)
+                    self.party_hp_lines.append(self.get_value_line(party_start_pos, 150, settings.COLORS.party_hp))
+                    self.party_mp_lines.append(self.get_value_line(party_start_pos, 150, settings.COLORS.party_mp))
+                    if not self.party_hp_lines[-1] or not self.party_mp_lines[-1]:
+                        del self.party_hp_lines[-1]
+                        del self.party_mp_lines[-1]
+                        break
+                else:
                     break
             print(self.party_mp_lines)
 
@@ -438,27 +444,17 @@ class MainLineageWindow(LineageWindow):
         self.update_screen()
         print('screnshot time', time.time() - start)
         if hasattr(self, 'hp_line'):
-            self.get_percent_thread('hp', self.hp_line, GraciaColors.hp)
+            self.get_percent_thread('hp', self.hp_line, settings.COLORS.hp)
         if hasattr(self, 'mp_line'):
-            self.get_percent_thread('mp', self.mp_line, GraciaColors.mp)
+            self.get_percent_thread('mp', self.mp_line, settings.COLORS.mp)
         if hasattr(self, 'target_hp_line'):
-            self.get_percent_thread('target_hp', self.target_hp_line, GraciaColors.hp)
+            self.get_percent_thread('target_hp', self.target_hp_line, settings.COLORS.target_hp)
 
         self.party_hps = []
-        self.get_party_percent_thread('party_hps', self.party_hp_lines, GraciaColors.party_hp)
+        self.get_party_percent_thread('party_hps', self.party_hp_lines, settings.COLORS.party_hp)
         self.party_mps = []
-        self.get_party_percent_thread('party_mps', self.party_mp_lines, GraciaColors.party_mp)
+        self.get_party_percent_thread('party_mps', self.party_mp_lines, settings.COLORS.party_mp)
 
-        # if self.target_hp == 100:
-        #     self.thp_100_count += 1
-        # if self.thp_100_count == 5:
-        #     self.target_hp = 0
-        #     self.last_target_hp = 0
-        # if self.target_hp < 100:
-        #     self.thp_100_count = 0
-        #
-        # if self.target_hp == 0:
-        #     self.target_change = True
 
         self.last_target_hp = self.target_hp
 
@@ -525,8 +521,6 @@ class MainLineageWindow(LineageWindow):
             if start_pos[1] == self.size[1] - 1 or start_pos[1] > top + max_height:
                 return None
             pixel = rgb_screen.getpixel((start_pos[0], start_pos[1]))
-            # if start_pos[1] > top+max_height:
-            #     start_pos = [start_pos[0]+1, top]
         i = 1
         top = start_pos[1]
         left = right = start_pos[0]

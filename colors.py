@@ -88,10 +88,13 @@ class GraciaColors:
 class MWColors:
     hp = [(137, 32, 31),
           (127, 62, 56),
-          (121, 28, 17),
-          (111, 23, 19)]
+          (121, 28, 17)]
 
     hp_dark = []
+
+    target_hp = [(111, 23, 19),
+                 (111, 23, 20),
+                 (111, 23, 21)]
 
     mp = [(5, 57, 134),
           (4, 47, 120),
@@ -99,11 +102,11 @@ class MWColors:
           (5, 56, 131),
           (5, 67, 136)]
 
-    party_hp = hp
+    party_hp = [(111, 23, 20)]
 
     party_hp_dark = hp_dark
 
-    party_mp = mp
+    party_mp = [(5, 63, 130), (6, 64, 130)]
 
     party_mp_dark = [(25, 39, 59),
                      (28, 42, 63)]
