@@ -1,12 +1,9 @@
 import win32api
-
 import settings
 from functions import get_screen, find_template, load_img_cv, img_to_cv, color_equal, get_windows_hwnd
 from time import sleep
 import time
-from colors import GraciaColors
 from multiprocessing import Process, Array
-import os
 from threading import Thread, Timer
 import serial
 import win32gui
